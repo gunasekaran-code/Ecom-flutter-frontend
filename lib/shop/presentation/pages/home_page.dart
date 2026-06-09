@@ -630,20 +630,8 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   Future<void> _checkWishlistStatus() async {
-    if (WishlistService().isInLocalWishlist(widget.product.id)) {
-      setState(() {
-        _isInWishlist = true;
-      });
-      return;
-    }
-
-    final status = await ApiService.isProductInWishlist(
-      userId: widget.userData['id'],
-      productId: widget.product.id,
-    ).timeout(const Duration(seconds: 2), onTimeout: () => false);
-    if (!mounted) return;
     setState(() {
-      _isInWishlist = status;
+      _isInWishlist = WishlistService().isInLocalWishlist(widget.product.id);
     });
   }
 
@@ -660,10 +648,11 @@ class _ProductCardState extends State<ProductCard> {
         );
       }
 
-      ApiService.removeFromWishlist(
-        userId: widget.userData['id'],
-        productId: widget.product.id,
-      ).timeout(const Duration(seconds: 2), onTimeout: () => false);
+      // Backend wishlist remove disabled for static wishlist mode.
+      // ApiService.removeFromWishlist(
+      //   userId: widget.userData['id'],
+      //   productId: widget.product.id,
+      // ).timeout(const Duration(seconds: 2), onTimeout: () => false);
       return;
     }
 
@@ -678,10 +667,11 @@ class _ProductCardState extends State<ProductCard> {
       );
     }
 
-    ApiService.addToWishlist(
-      userId: widget.userData['id'],
-      productId: widget.product.id,
-    ).timeout(const Duration(seconds: 2), onTimeout: () => false);
+    // Backend wishlist add disabled for static wishlist mode.
+    // ApiService.addToWishlist(
+    //   userId: widget.userData['id'],
+    //   productId: widget.product.id,
+    // ).timeout(const Duration(seconds: 2), onTimeout: () => false);
   }
 
   @override

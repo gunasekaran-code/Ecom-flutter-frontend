@@ -65,68 +65,59 @@ class _WishlistPageState extends State<WishlistPage> {
       isLoading = false;
     });
 
-    try {
-      final items = await ApiService.getWishlist(
-        widget.userData['id'],
-      ).timeout(const Duration(seconds: 2), onTimeout: () => []);
-      final apiItems = List<Map<String, dynamic>>.from(items);
-      final mergedLocalItems = WishlistService().localWishlistProducts
-          .map((product) => product.toWishlistItem())
-          .where(
-            (localItem) => !apiItems.any(
-              (apiItem) => apiItem['product_id'] == localItem['product_id'],
-            ),
-          )
-          .toList();
-
-      setState(() {
-        wishlistItems = [...apiItems, ...mergedLocalItems];
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: kBrandRed,
-            content: Text('Error loading wishlist: $e'),
-          ),
-        );
-      }
-    }
+    // Backend wishlist fetch disabled for static wishlist mode.
+    // try {
+    //   final items = await ApiService.getWishlist(
+    //     widget.userData['id'],
+    //   ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+    //   final apiItems = List<Map<String, dynamic>>.from(items);
+    //   final mergedLocalItems = WishlistService().localWishlistProducts
+    //       .map((product) => product.toWishlistItem())
+    //       .where(
+    //         (localItem) => !apiItems.any(
+    //           (apiItem) => apiItem['product_id'] == localItem['product_id'],
+    //         ),
+    //       )
+    //       .toList();
+    //
+    //   setState(() {
+    //     wishlistItems = [...apiItems, ...mergedLocalItems];
+    //     isLoading = false;
+    //   });
+    // } catch (e) {
+    //   setState(() => isLoading = false);
+    // }
   }
 
   Future<void> _removeFromWishlist(int productId) async {
-    try {
-      final success = await ApiService.removeFromWishlist(
-        userId: widget.userData['id'],
-        productId: productId,
+    // Backend wishlist remove disabled for static wishlist mode.
+    // final success = await ApiService.removeFromWishlist(
+    //   userId: widget.userData['id'],
+    //   productId: productId,
+    // );
+    WishlistService().removeLocalProduct(productId);
+    setState(() {
+      wishlistItems.removeWhere((item) => item['product_id'] == productId);
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: kBrandRed,
+          content: const Text(
+            'Removed from wishlist',
+            style: TextStyle(color: Colors.white),
+          ),
+          duration: const Duration(seconds: 1),
+        ),
       );
-      if (success || WishlistService().isInLocalWishlist(productId)) {
-        WishlistService().removeLocalProduct(productId);
-        setState(() {
-          wishlistItems.removeWhere((item) => item['product_id'] == productId);
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: kBrandRed,
-              content: const Text(
-                'Removed from wishlist',
-                style: TextStyle(color: Colors.white),
-              ),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: kBrandRed, content: Text('Error: $e')),
-        );
-      }
     }
+    // } catch (e) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(backgroundColor: kBrandRed, content: Text('Error: $e')),
+    //     );
+    //   }
+    // }
   }
 
   Future<void> _moveToCart(Map<String, dynamic> item) async {
@@ -142,10 +133,12 @@ class _WishlistPageState extends State<WishlistPage> {
         throw 'This product is currently out of stock.';
       }
 
-      final removed = await ApiService.removeFromWishlist(
-        userId: widget.userData['id'],
-        productId: productId,
-      );
+      // Backend wishlist remove disabled for static wishlist mode.
+      // final removed = await ApiService.removeFromWishlist(
+      //   userId: widget.userData['id'],
+      //   productId: productId,
+      // );
+      const removed = true;
 
       if (removed) {
         setState(() {
@@ -153,9 +146,7 @@ class _WishlistPageState extends State<WishlistPage> {
             (wishlistItem) => wishlistItem['product_id'] == productId,
           );
         });
-        WishlistService().notifyWishlistChange(
-          WishlistChangeEvent(productId: productId, isAdded: false),
-        );
+        WishlistService().removeLocalProduct(productId);
       }
 
       CartService().notifyCartChange(

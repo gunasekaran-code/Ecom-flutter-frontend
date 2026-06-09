@@ -32,6 +32,21 @@ class CheckoutPage extends StatefulWidget {
 
 class _CheckoutPageState extends State<CheckoutPage> {
   static const String _razorpayKeyId = 'rzp_test_Sjf5R4l0R8Ah9G';
+  static const List<Map<String, dynamic>> _staticAddresses = [
+    {
+      'id': 1,
+      'address_type': 'home',
+      'first_name': 'Guna',
+      'last_name': 'Kumar',
+      'address_line_1': '12 Sports Academy Street',
+      'address_line_2': 'Near Main Ground',
+      'city': 'Chennai',
+      'state': 'Tamil Nadu',
+      'postal_code': '600001',
+      'country': 'India',
+      'is_default': true,
+    },
+  ];
 
   final RazorpayService _razorpayService = RazorpayService();
 
@@ -274,21 +289,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Future<void> _loadSavedAddresses() async {
     setState(() => _isLoadingAddresses = true);
-    final result = await ApiService.getUserAddresses(widget.userId);
+    // Backend address fetch disabled for static address mode.
+    // final result = await ApiService.getUserAddresses(widget.userId);
     if (!mounted) return;
     setState(() {
       _isLoadingAddresses = false;
-      if (result['addresses'] != null) {
-        _savedAddresses = List<Map<String, dynamic>>.from(result['addresses']);
-        if (_savedAddresses.isNotEmpty) {
-          final defaultAddress = _savedAddresses.firstWhere(
-            (addr) => addr['is_default'] == true,
-            orElse: () => _savedAddresses.first,
-          );
-          _selectedAddressId = defaultAddress['id'];
-        } else {
-          _showAddressForm = true;
-        }
+      _savedAddresses = _staticAddresses
+          .map((address) => Map<String, dynamic>.from(address))
+          .toList();
+      if (_savedAddresses.isNotEmpty) {
+        final defaultAddress = _savedAddresses.firstWhere(
+          (addr) => addr['is_default'] == true,
+          orElse: () => _savedAddresses.first,
+        );
+        _selectedAddressId = defaultAddress['id'];
+      } else {
+        _showAddressForm = true;
       }
     });
   }
@@ -314,42 +330,49 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
     setState(() => _isSavingAddress = true);
-    final result = await ApiService.createAddress(
-      userId: widget.userId,
-      addressData: {
-        'address_type': _selectedAddressType,
-        'first_name': _firstNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
-        'address_line_1': _addressLine1Controller.text.trim(),
-        'address_line_2': _addressLine2Controller.text.trim(),
-        'city': _cityController.text.trim(),
-        'state': _selectedState,
-        'postal_code': _postalCodeController.text.trim(),
-        'country': _selectedCountry,
-        'is_default': _savedAddresses.isEmpty,
-      },
-    );
+    // Backend address create disabled for static address mode.
+    // final result = await ApiService.createAddress(
+    //   userId: widget.userId,
+    //   addressData: {
+    //     'address_type': _selectedAddressType,
+    //     'first_name': _firstNameController.text.trim(),
+    //     'last_name': _lastNameController.text.trim(),
+    //     'address_line_1': _addressLine1Controller.text.trim(),
+    //     'address_line_2': _addressLine2Controller.text.trim(),
+    //     'city': _cityController.text.trim(),
+    //     'state': _selectedState,
+    //     'postal_code': _postalCodeController.text.trim(),
+    //     'country': _selectedCountry,
+    //     'is_default': _savedAddresses.isEmpty,
+    //   },
+    // );
     if (!mounted) return;
-    setState(() => _isSavingAddress = false);
-    if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Address saved successfully'),
-          backgroundColor: Color(0xFF1DB954),
-        ),
-      );
-      _clearForm();
-      await _loadSavedAddresses();
-      setState(() => _showAddressForm = false);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result['error']?.toString() ?? 'Failed to save address',
-          ),
-        ),
-      );
-    }
+    final newAddress = {
+      'id': DateTime.now().millisecondsSinceEpoch,
+      'address_type': _selectedAddressType,
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+      'address_line_1': _addressLine1Controller.text.trim(),
+      'address_line_2': _addressLine2Controller.text.trim(),
+      'city': _cityController.text.trim(),
+      'state': _selectedState,
+      'postal_code': _postalCodeController.text.trim(),
+      'country': _selectedCountry,
+      'is_default': _savedAddresses.isEmpty,
+    };
+    setState(() {
+      _savedAddresses.add(newAddress);
+      _selectedAddressId = newAddress['id'] as int;
+      _isSavingAddress = false;
+      _showAddressForm = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Address saved successfully'),
+        backgroundColor: Color(0xFF1DB954),
+      ),
+    );
+    _clearForm();
   }
 
   void _clearForm() {
@@ -411,28 +434,27 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
     if (confirm == true) {
-      final result = await ApiService.deleteAddress(
-        addressId: addressId,
-        userId: widget.userId,
-      );
+      // Backend address delete disabled for static address mode.
+      // final result = await ApiService.deleteAddress(
+      //   addressId: addressId,
+      //   userId: widget.userId,
+      // );
       if (!mounted) return;
-      if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Address deleted'),
-            backgroundColor: Color(0xFF1DB954),
-          ),
-        );
-        await _loadSavedAddresses();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result['error']?.toString() ?? 'Failed to delete address',
-            ),
-          ),
-        );
-      }
+      setState(() {
+        _savedAddresses.removeWhere((address) => address['id'] == addressId);
+        if (_selectedAddressId == addressId) {
+          _selectedAddressId = _savedAddresses.isEmpty
+              ? null
+              : _savedAddresses.first['id'] as int;
+        }
+        _showAddressForm = _savedAddresses.isEmpty;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address deleted'),
+          backgroundColor: Color(0xFF1DB954),
+        ),
+      );
     }
   }
 

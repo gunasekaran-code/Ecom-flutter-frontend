@@ -10,8 +10,9 @@ class ApiService {
   // static const String baseUrl = 'http://127.0.0.1:8000/api'; // localhost chrome (Flutter web)
   // static const String baseUrl = 'http://10.0.2.2:8000/api';        // mobile emulator (Android Studio)
   // static const String baseUrl = 'http://192.168.1.11/api';         // wifi network
-  
-  static const String baseUrl = 'http://192.168.1.12:8000/api';    // wifi network added = 8000
+
+  static const String baseUrl =
+      'http://192.168.1.12:8000/api'; // wifi network added = 8000
 
   // Enable debug mode to see detailed logs
   static const bool debugMode = true;
@@ -200,15 +201,11 @@ class ApiService {
         return {'success': true, 'data': data};
       }
 
-      return {
-        'success': false,
-        'error': data['message'] ?? 'Reset failed',
-      };
+      return {'success': false, 'error': data['message'] ?? 'Reset failed'};
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
   }
-
 
   // static Future<Map<String, dynamic>> resetPassword({
   //   required String token,
@@ -226,7 +223,7 @@ class ApiService {
   //             'Accept': 'application/json',
   //           },
   //           body: jsonEncode({
-  //             'token': token, 
+  //             'token': token,
   //             'email': email,
   //             'password': password,
   //             'password_confirmation': passwordConfirmation,
@@ -823,14 +820,15 @@ class ApiService {
   // ============= WISHLIST APIs =============
 
   static Future<List<dynamic>> getWishlist(int userId) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/wishlist/$userId/'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-    } catch (e) {
-      _logError('Error fetching wishlist: $e');
-    }
+    // Backend disabled for static wishlist mode.
+    // try {
+    //   final response = await http.get(Uri.parse('$baseUrl/wishlist/$userId/'));
+    //   if (response.statusCode == 200) {
+    //     return jsonDecode(response.body);
+    //   }
+    // } catch (e) {
+    //   _logError('Error fetching wishlist: $e');
+    // }
     return [];
   }
 
@@ -838,51 +836,56 @@ class ApiService {
     required int userId,
     required int productId,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/wishlist/add/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"user_id": userId, "product_id": productId}),
-      );
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      _logError('Error adding to wishlist: $e');
-      return false;
-    }
+    // Backend disabled for static wishlist mode.
+    // try {
+    //   final response = await http.post(
+    //     Uri.parse('$baseUrl/wishlist/add/'),
+    //     headers: {'Content-Type': 'application/json'},
+    //     body: jsonEncode({"user_id": userId, "product_id": productId}),
+    //   );
+    //   return response.statusCode == 200 || response.statusCode == 201;
+    // } catch (e) {
+    //   _logError('Error adding to wishlist: $e');
+    //   return false;
+    // }
+    return true;
   }
 
   static Future<bool> removeFromWishlist({
     required int userId,
     required int productId,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/wishlist/remove/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"user_id": userId, "product_id": productId}),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      _logError('Error removing from wishlist: $e');
-      return false;
-    }
+    // Backend disabled for static wishlist mode.
+    // try {
+    //   final response = await http.post(
+    //     Uri.parse('$baseUrl/wishlist/remove/'),
+    //     headers: {'Content-Type': 'application/json'},
+    //     body: jsonEncode({"user_id": userId, "product_id": productId}),
+    //   );
+    //   return response.statusCode == 200;
+    // } catch (e) {
+    //   _logError('Error removing from wishlist: $e');
+    //   return false;
+    // }
+    return true;
   }
 
   static Future<bool> isProductInWishlist({
     required int userId,
     required int productId,
   }) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/wishlist/check/$userId/$productId/'),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['is_in_wishlist'] ?? false;
-      }
-    } catch (e) {
-      _logError('Error checking wishlist: $e');
-    }
+    // Backend disabled for static wishlist mode.
+    // try {
+    //   final response = await http.get(
+    //     Uri.parse('$baseUrl/wishlist/check/$userId/$productId/'),
+    //   );
+    //   if (response.statusCode == 200) {
+    //     final data = jsonDecode(response.body);
+    //     return data['is_in_wishlist'] ?? false;
+    //   }
+    // } catch (e) {
+    //   _logError('Error checking wishlist: $e');
+    // }
     return false;
   }
 

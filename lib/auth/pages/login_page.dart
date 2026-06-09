@@ -29,15 +29,15 @@ class _LoginPageState extends State<LoginPage> {
   final GoogleAuthService _googleAuthService = GoogleAuthService();
   bool isLoading = false;
 
-  static const String _demoEmail = 'gunasekaran.code@gmail.com';
+  static const String _demoEmail = 'guna@gmail.com';
   static const String _demoPassword = '123456';
-  static const String _demoName = 'gunasekaran';
+  static const String _demoName = 'Guna Sekaran V';
 
   @override
   void initState() {
     super.initState();
-    emailController.text = _demoEmail;
-    passwordController.text = _demoPassword;
+    // emailController.text = _demoEmail;
+    // passwordController.text = _demoPassword;
     if (kIsWeb) _renderGoogleButton();
   }
 
