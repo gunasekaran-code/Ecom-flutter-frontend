@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:uni_links/uni_links.dart';
 
 import 'package:ecom_app/core/localization/app_language.dart';
 import 'package:ecom_app/core/localization/app_strings.dart';
@@ -39,7 +39,7 @@ class _MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   // Deep Link Subscription
-  StreamSubscription? _sub;
+  StreamSubscription<Uri>? _sub;
   _ResetPasswordLink? _pendingResetLink;
 
   @override
@@ -59,17 +59,15 @@ class _MyAppState extends State<MyApp> {
   Future<void> initDeepLinks() async {
     try {
       // App opened from terminated state
-      final initialLink = await getInitialLink();
+      final initialLink = await AppLinks().getInitialLink();
 
       if (initialLink != null) {
-        handleDeepLink(initialLink);
+        handleDeepLink(initialLink.toString());
       }
 
       // App opened from background
-      _sub = linkStream.listen((String? link) {
-        if (link != null) {
-          handleDeepLink(link);
-        }
+      _sub = AppLinks().uriLinkStream.listen((Uri uri) {
+        handleDeepLink(uri.toString());
       });
     } catch (e) {
       debugPrint("Deep Link Error: $e");

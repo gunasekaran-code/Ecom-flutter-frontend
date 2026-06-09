@@ -256,22 +256,22 @@ class _HomePageState extends State<HomePage> {
                               setState(() => _currentCarouselIndex = index),
                           children: [
                             _buildCarouselItem(
-                              'assets/images/mardani_khel.jpg',
+                              'assets/images/image1.jpg',
                               'Mardani Khel',
                               'Maharashtra Weapon Art',
                             ),
                             _buildCarouselItem(
-                              'assets/images/gatka.jpg',
+                              'assets/images/image2.jpg',
                               'Gatka',
                               'Traditional Sikh ',
                             ),
                             _buildCarouselItem(
-                              'assets/images/thang_ta.jpg',
+                              'assets/images/image3.jpg',
                               'Thang-Ta',
                               'Manipuri Sword & Spear Art',
                             ),
                             _buildCarouselItem(
-                              'assets/images/kalaripayattu.jpg',
+                              'assets/images/image4.jpg',
                               'Kalaripayattu',
                               'Ancient Kerala ',
                             ),
