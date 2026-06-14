@@ -26,6 +26,10 @@ class _ProfilePageState extends State<ProfilePage> {
       AppLanguageController.instance;
   late Map<String, dynamic> _userData;
 
+  String get orders => 'Orders';
+  String get wishlist => 'Wishlist';
+  String get reviews => 'Reviews';
+
   String get _fullName =>
       (_userData['full_name'] ?? _userData['name'] ?? 'User').toString();
   String get _email => (_userData['email'] ?? 'No email').toString();
@@ -298,11 +302,11 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         child: Row(
           children: [
-            _statTile(Icons.bolt_rounded, '128', strings.activity),
+            _statTile(Icons.shopping_bag_outlined, '24', strings.orders),
             _divider(),
-            _statTile(Icons.favorite_border_rounded, '46', strings.favorites),
+            _statTile(Icons.favorite_border_rounded, '57', strings.wishlist),
             _divider(),
-            _statTile(Icons.emoji_events_outlined, '12', strings.awards),
+            _statTile(Icons.star_border_rounded, '8', strings.reviews),
           ],
         ),
       ),

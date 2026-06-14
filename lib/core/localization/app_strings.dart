@@ -59,6 +59,7 @@ class AppStrings {
   String get home => _text('home');
   String get orders => _text('orders');
   String get wishlist => _text('wishlist');
+  String get reviews => _text('reviews');
   String get profile => _text('profile');
   String get myProfile => _text('myProfile');
   String get activity => _text('activity');
