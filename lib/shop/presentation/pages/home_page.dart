@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ecom_app/core/localization/app_strings.dart';
 import 'package:ecom_app/models/product_model.dart';
-import 'package:ecom_app/services/api_service.dart';
 import 'package:ecom_app/services/wishlist_service.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/shop/presentation/pages/product_detail_page.dart';
@@ -139,8 +138,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchCartCount() async {
-    final count = await ApiService.getCartCount(widget.userData['id']);
-    setState(() => cartCount = count + CartService().localCartCount);
+    setState(() => cartCount = CartService().localCartCount);
   }
 
   Future<void> _showAllProducts() async {
@@ -648,11 +646,6 @@ class _ProductCardState extends State<ProductCard> {
         );
       }
 
-      // Backend wishlist remove disabled for static wishlist mode.
-      // ApiService.removeFromWishlist(
-      //   userId: widget.userData['id'],
-      //   productId: widget.product.id,
-      // ).timeout(const Duration(seconds: 2), onTimeout: () => false);
       return;
     }
 
@@ -666,12 +659,6 @@ class _ProductCardState extends State<ProductCard> {
         ),
       );
     }
-
-    // Backend wishlist add disabled for static wishlist mode.
-    // ApiService.addToWishlist(
-    //   userId: widget.userData['id'],
-    //   productId: widget.product.id,
-    // ).timeout(const Duration(seconds: 2), onTimeout: () => false);
   }
 
   @override

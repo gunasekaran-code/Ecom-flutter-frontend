@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/services/api_service.dart';
-import 'package:ecom_app/services/razorpay_service.dart';
+import 'package:ecom_app/services/cart_service.dart';
+import 'package:ecom_app/services/order_service.dart';
 import 'package:ecom_app/pages/payment_success_page.dart';
-import 'package:ecom_app/pages/payment_failed_page.dart';
 
 const Color kBrandRed = Color(0xFFE4252A);
 const Color kTextDark = Color(0xFF1A1A1A);
@@ -31,7 +30,6 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  static const String _razorpayKeyId = 'rzp_test_Sjf5R4l0R8Ah9G';
   static const List<Map<String, dynamic>> _staticAddresses = [
     {
       'id': 1,
@@ -47,8 +45,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'is_default': true,
     },
   ];
-
-  final RazorpayService _razorpayService = RazorpayService();
 
   List<Map<String, dynamic>> _savedAddresses = [];
   bool _isLoadingAddresses = true;
@@ -94,16 +90,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
   @override
   void initState() {
     super.initState();
-    _razorpayService.init(
-      onSuccess: _handlePaymentSuccess,
-      onError: _handlePaymentError,
-    );
     _loadSavedAddresses();
   }
 
   @override
   void dispose() {
-    _razorpayService.clear();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _addressLine1Controller.dispose();
@@ -113,152 +104,57 @@ class _CheckoutPageState extends State<CheckoutPage> {
     super.dispose();
   }
 
-  // ─── Razorpay Event Handlers ──────────────────────────────────────────────
+  // ─── Submit Order to Backend ─────────────────────────────────────────────
 
-  void _handlePaymentSuccess(String paymentId) {
-    debugPrint('✅ Razorpay Payment Success: $paymentId');
-    if (!mounted) return;
-    _submitOrderToBackend(paymentId: paymentId);
-  }
+  Future<void> _submitOrderToBackend() async {
+    setState(() => _isPlacingOrder = true);
 
-  void _handlePaymentError(String message, bool isCancelled) {
-    debugPrint('❌ Razorpay Payment Error: $message');
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    final order = OrderService().createOrder(
+      userId: widget.userId,
+      items: widget.selectedItems,
+      paymentMethod: _paymentMethod,
+      totalAmount: total,
+      totalItems: _itemsCount,
+      address: _selectedAddress,
+    );
+
     if (!mounted) return;
     setState(() => _isPlacingOrder = false);
-    Navigator.of(context).push(
+
+    CartService().removeLocalProducts(
+      widget.selectedItems
+          .map<int?>((item) => item['product_id'] as int?)
+          .whereType<int>(),
+    );
+
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => PaymentFailedPage(
-          title: isCancelled ? 'Payment Cancelled' : 'Payment Failed',
-          message: isCancelled
-              ? 'No amount was charged. You can review the order and try again whenever you are ready.'
-              : message,
-          amount: total,
-          itemsCount: _itemsCount,
+        builder: (_) => PaymentSuccessPage(
+          title: _paymentMethod == 'cod'
+              ? 'Order Confirmed'
+              : 'Payment Successful',
+          subtitle: _paymentMethod == 'cod'
+              ? 'Pay at your doorstep'
+              : 'Successfully Paid',
+          amount: _readAmount(order['total_amount']),
+          itemPrice: subtotal,
+          deliveryFee: widget.deliveryFee,
+          discount: widget.promoApplied
+              ? (subtotal * widget.discountPercent / 100)
+              : 0.0,
+          itemsCount: _readCount(order['total_items']),
           paymentMethodLabel: _paymentMethodLabel,
-          address: _selectedAddress,
+          orderId: order['id']?.toString(),
+          address: order,
           selectedItems: widget.selectedItems,
-          isCancelled: isCancelled,
-          onTryAgain: () {
-            Navigator.of(context).pop();
-          },
-          onBack: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).pop();
+          onContinueShopping: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
           },
         ),
       ),
     );
-  }
-
-  // ─── Open Razorpay Checkout ───────────────────────────────────────────────
-
-  void _openRazorpayCheckout() {
-    final int amountInPaise = (total * 100).round();
-    final options = <String, dynamic>{
-      'key': _razorpayKeyId,
-      'amount': amountInPaise,
-      'currency': 'INR',
-      'name': 'WSS Sports Academy',
-      'description': 'Order Payment',
-      'theme': {'color': '#E4252A'},
-      'prefill': {'contact': '9163612345', 'email': 'user@gmail.com'},
-      'external': {
-        'wallets': ['paytm', 'phonepe'],
-      },
-    };
-
-    try {
-      _razorpayService.open(options);
-    } catch (e) {
-      debugPrint('Razorpay open error: $e');
-      setState(() => _isPlacingOrder = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open payment gateway: $e')),
-        );
-      }
-    }
-  }
-
-  // ─── Submit Order to Backend ─────────────────────────────────────────────
-
-  Future<void> _submitOrderToBackend({String? paymentId}) async {
-    setState(() => _isPlacingOrder = true);
-
-    final result = await ApiService.checkoutCart(
-      userId: widget.userId,
-      productIds: widget.selectedItems
-          .map<int>((item) => item['product_id'] as int)
-          .toList(),
-      addressId: _selectedAddressId,
-      paymentMethod: _paymentMethod,
-    );
-
-    if (!mounted) return;
-    setState(() => _isPlacingOrder = false);
-
-    if (result['success'] == true) {
-      final payload = result['data'];
-      Map<String, dynamic>? order;
-      if (payload is Map && payload['order'] is Map) {
-        order = Map<String, dynamic>.from(payload['order'] as Map);
-      }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => PaymentSuccessPage(
-            title: _paymentMethod == 'cod'
-                ? 'Order Confirmed'
-                : 'Payment Successful',
-            subtitle: _paymentMethod == 'cod'
-                ? 'Pay at your doorstep'
-                : 'Successfully Paid',
-            amount: _readAmount(order?['total_amount']),
-            itemPrice: subtotal,
-            deliveryFee: widget.deliveryFee,
-            discount: widget.promoApplied
-                ? (subtotal * widget.discountPercent / 100)
-                : 0.0,
-            itemsCount: _readCount(order?['total_items']),
-            paymentMethodLabel: _paymentMethodLabel,
-            paymentId: paymentId,
-            orderId: order?['id']?.toString(),
-            address: order ?? _selectedAddress,
-            selectedItems: widget.selectedItems,
-            onContinueShopping: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          ),
-        ),
-      );
-    } else {
-      final bool paymentWasCaptured = paymentId != null && paymentId.isNotEmpty;
-      final String errorMessage =
-          result['error']?.toString() ?? 'Failed to place order';
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => PaymentFailedPage(
-            title: paymentWasCaptured ? 'Payment Received' : 'Order Failed',
-            message: paymentWasCaptured
-                ? 'Your payment went through, but we could not confirm the order. Please keep this payment ID for support.'
-                : errorMessage,
-            amount: total,
-            itemsCount: _itemsCount,
-            paymentMethodLabel: _paymentMethodLabel,
-            paymentId: paymentId,
-            address: _selectedAddress,
-            selectedItems: widget.selectedItems,
-            isCancelled: false,
-            onTryAgain: () => Navigator.of(context).pop(),
-            onBack: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-          ),
-        ),
-      );
-    }
   }
 
   // ─── Place Order Entry Point ──────────────────────────────────────────────
@@ -278,19 +174,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     setState(() => _isPlacingOrder = true);
 
-    if (_paymentMethod == 'cod') {
-      await _submitOrderToBackend();
-    } else {
-      _openRazorpayCheckout();
-    }
+    await _submitOrderToBackend();
   }
 
   // ─── Address ─────────────────────────────────────────────────────────────
 
   Future<void> _loadSavedAddresses() async {
     setState(() => _isLoadingAddresses = true);
-    // Backend address fetch disabled for static address mode.
-    // final result = await ApiService.getUserAddresses(widget.userId);
     if (!mounted) return;
     setState(() {
       _isLoadingAddresses = false;
@@ -330,22 +220,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
     setState(() => _isSavingAddress = true);
-    // Backend address create disabled for static address mode.
-    // final result = await ApiService.createAddress(
-    //   userId: widget.userId,
-    //   addressData: {
-    //     'address_type': _selectedAddressType,
-    //     'first_name': _firstNameController.text.trim(),
-    //     'last_name': _lastNameController.text.trim(),
-    //     'address_line_1': _addressLine1Controller.text.trim(),
-    //     'address_line_2': _addressLine2Controller.text.trim(),
-    //     'city': _cityController.text.trim(),
-    //     'state': _selectedState,
-    //     'postal_code': _postalCodeController.text.trim(),
-    //     'country': _selectedCountry,
-    //     'is_default': _savedAddresses.isEmpty,
-    //   },
-    // );
     if (!mounted) return;
     final newAddress = {
       'id': DateTime.now().millisecondsSinceEpoch,
@@ -405,7 +279,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   );
 
   String get _paymentMethodLabel =>
-      _paymentMethod == 'cod' ? 'Cash on Delivery' : 'UPI / Card';
+      _paymentMethod == 'cod' ? 'Cash on Delivery' : 'UPI';
 
   double _readAmount(dynamic value) =>
       double.tryParse(value?.toString() ?? '') ?? total;
@@ -434,11 +308,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
     if (confirm == true) {
-      // Backend address delete disabled for static address mode.
-      // final result = await ApiService.deleteAddress(
-      //   addressId: addressId,
-      //   userId: widget.userId,
-      // );
       if (!mounted) return;
       setState(() {
         _savedAddresses.removeWhere((address) => address['id'] == addressId);
@@ -627,7 +496,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               child: Image.network(
                 item['image'],
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.image_outlined, color: Colors.grey),
               ),
             ),
@@ -716,9 +585,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(height: 12),
           _buildPaymentOption(
             value: 'upi',
-            title: 'UPI / Card',
-            subtitle: 'Pay securely via Razorpay',
-            icon: Icons.credit_card_rounded,
+            title: 'UPI',
+            subtitle: 'Pay online and confirm your order',
+            icon: Icons.account_balance_wallet_rounded,
             iconColor: const Color(0xFF6C63FF),
           ),
           Padding(
@@ -864,7 +733,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     Text(
                       _paymentMethod == 'cod'
                           ? 'Place Order • ₹${total.toStringAsFixed(2)}'
-                          : 'Pay ₹${total.toStringAsFixed(2)}',
+                          : 'Pay Online • ₹${total.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,

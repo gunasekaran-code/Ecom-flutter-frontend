@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:ecom_app/services/api_service.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/shop/presentation/pages/checkout_page.dart';
 
@@ -42,20 +41,6 @@ class _CartPageState extends State<CartPage> {
 
   Future<void> loadCart() async {
     _applyCartItems(CartService().localCartItems);
-
-    final apiItems = await ApiService.getCart(
-      widget.userId,
-    ).timeout(const Duration(seconds: 2), onTimeout: () => []);
-    final items = [
-      ...apiItems,
-      ...CartService().localCartItems.where(
-        (localItem) => !apiItems.any(
-          (apiItem) => apiItem['product_id'] == localItem['product_id'],
-        ),
-      ),
-    ];
-
-    _applyCartItems(items);
   }
 
   void _applyCartItems(List items) {
@@ -198,34 +183,7 @@ class _CartPageState extends State<CartPage> {
       cartItems[index]['quantity'] = newQuantity;
     });
 
-    final success = await ApiService.updateCartItem(
-      userId: widget.userId,
-      productId: productId,
-      quantity: newQuantity,
-    );
-
-    if (!success && CartService().isInLocalCart(productId)) {
-      CartService().updateLocalQuantity(productId, newQuantity);
-      return;
-    } else if (success && CartService().isInLocalCart(productId)) {
-      CartService().updateLocalQuantity(productId, newQuantity);
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    if (!success) {
-      setState(() {
-        cartItems[index]['quantity'] = currentQuantity;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update quantity'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    CartService().updateLocalQuantity(productId, newQuantity);
   }
 
   Future<void> proceedToCheckout() async {
@@ -256,50 +214,19 @@ class _CartPageState extends State<CartPage> {
   void removeItem(int index) async {
     final productId = cartItems[index]['product_id'];
     final productName = cartItems[index]['product_name'];
-    final removedItem = cartItems[index];
-    final wasSelected = selectedProductIds.contains(productId);
-
     setState(() {
       cartItems.removeAt(index);
       selectedProductIds.remove(productId);
     });
 
-    final success = await ApiService.removeFromCart(
-      userId: widget.userId,
-      productId: productId,
-    );
-
-    if (success && CartService().isInLocalCart(productId)) {
-      CartService().removeLocalProduct(productId);
-    } else if (!success && CartService().isInLocalCart(productId)) {
-      CartService().removeLocalProduct(productId);
-    } else if (!success) {
-      setState(() {
-        cartItems.insert(index, removedItem);
-        if (wasSelected) {
-          selectedProductIds.add(productId);
-        }
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to remove item'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } else {
-      CartService().notifyCartChange(
-        CartChangeEvent(productId: productId, isAdded: false),
+    CartService().removeLocalProduct(productId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$productName removed from cart'),
+          duration: const Duration(seconds: 1),
+        ),
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$productName removed from cart'),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      }
     }
   }
 

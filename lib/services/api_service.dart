@@ -5,14 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 class ApiService {
-  // static const String baseUrl = 'http://192.168.1.10:8000/api';
-  // static const String baseUrl = 'https://e-commerce-app-spee.onrender.com/api';  // Render for deployed backend
-  // static const String baseUrl = 'http://127.0.0.1:8000/api'; // localhost chrome (Flutter web)
-  // static const String baseUrl = 'http://10.0.2.2:8000/api';        // mobile emulator (Android Studio)
-  // static const String baseUrl = 'http://192.168.1.11/api';         // wifi network
-
-  static const String baseUrl =
-      'http://192.168.1.12:8000/api'; // wifi network added = 8000
+  static const String baseUrl = 'http://192.168.1.12:8000/api';
 
   // Enable debug mode to see detailed logs
   static const bool debugMode = true;
@@ -207,54 +200,6 @@ class ApiService {
     }
   }
 
-  // static Future<Map<String, dynamic>> resetPassword({
-  //   required String token,
-  //   required String email,
-  //   required String password,
-  //   required String passwordConfirmation,
-  // }) async {
-  //   try {
-  //     _log('Resetting password for: $email');
-  //     final response = await http
-  //         .post(
-  //           Uri.parse('$baseUrl/reset-password/'),
-  //           headers: {
-  //             'Content-Type': 'application/json',
-  //             'Accept': 'application/json',
-  //           },
-  //           body: jsonEncode({
-  //             'token': token,
-  //             'email': email,
-  //             'password': password,
-  //             'password_confirmation': passwordConfirmation,
-  //           }),
-  //         )
-  //         .timeout(const Duration(seconds: 30));
-
-  //     _log('Reset password status: ${response.statusCode}');
-  //     _log('Reset password body: ${response.body}');
-
-  //     final data = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-
-  //     if (response.statusCode == 200 || response.statusCode == 201) {
-  //       return {'success': true, 'data': data};
-  //     }
-
-  //     return {
-  //       'success': false,
-  //       'error':
-  //           data['error'] ??
-  //           data['detail'] ??
-  //           data['message'] ??
-  //           'Unable to change password.',
-  //     };
-  //   } on TimeoutException catch (e) {
-  //     return {'success': false, 'error': 'Request timeout: $e'};
-  //   } catch (e) {
-  //     return {'success': false, 'error': 'Network error: $e'};
-  //   }
-  // }
-
   static Future<Map<String, dynamic>> registerUser({
     required String fullName,
     required String email,
@@ -303,68 +248,6 @@ class ApiService {
       return {'success': false, 'error': 'Network error: $e'};
     }
   }
-
-  // static Future<Map<String, dynamic>> registerUser({
-  //   required String fullName,
-  //   required String email,
-  //   required String password,
-  // }) async {
-  //   try {
-  //     _log('Attempting registration to: $baseUrl/users/create/');
-
-  //     final requestBody = jsonEncode({
-  //       'full_name': fullName,
-  //       'email': email,
-  //       'password': password,
-  //       'password_confirmation': password,
-  //     });
-  //     _log('Request body: $requestBody');
-
-  //     final response = await http
-  //         .post(
-  //           Uri.parse('$baseUrl/users/create/'),
-  //           headers: {'Content-Type': 'application/json'},
-  //           body: requestBody,
-  //         )
-  //         .timeout(const Duration(seconds: 30));
-
-  //     _log('Response status: ${response.statusCode}');
-  //     _log('Response body: ${response.body}');
-
-  //     if (response.body.isEmpty) {
-  //       _logError('Empty response body received');
-  //       return {
-  //         'success': false,
-  //         'error':
-  //             'Server returned empty response. Status: ${response.statusCode}',
-  //       };
-  //     }
-
-  //     try {
-  //       final data = jsonDecode(response.body);
-
-  //       if (response.statusCode == 201 || response.statusCode == 200) {
-  //         _log('Registration successful');
-  //         return {'success': true, 'data': data};
-  //       } else {
-  //         _logError('Registration failed with status: ${response.statusCode}');
-  //         return {'success': false, 'error': data};
-  //       }
-  //     } catch (jsonError) {
-  //       _logError('JSON parsing error: $jsonError');
-  //       return {'success': false, 'error': 'Server error: ${response.body}'};
-  //     }
-  //   } on TimeoutException catch (e) {
-  //     _logError('Request timeout: $e');
-  //     return {
-  //       'success': false,
-  //       'error': 'Request timed out. Please try again.',
-  //     };
-  //   } catch (e) {
-  //     _logError('Network error: $e');
-  //     return {'success': false, 'error': 'Network error: $e'};
-  //   }
-  // }
 
   static Future<Map<String, dynamic>> updateUser({
     required int id,
@@ -782,41 +665,6 @@ class ApiService {
     }
   }
 
-  // static Future<Map<String, dynamic>> checkoutCart({
-  //   required int userId,
-  //   required List<int> productIds,
-  //   int? addressId,
-  //   Map<String, dynamic>? shippingAddress,
-  //   required String paymentMethod,
-  // }) async {
-  //   try {
-  //     final body = {
-  //       'user_id': userId,
-  //       'product_ids': productIds,
-  //       'payment_method': paymentMethod,
-  //     };
-
-  //     if (addressId != null) {
-  //       body['address_id'] = addressId;
-  //     } else if (shippingAddress != null) {
-  //       body['shipping_address'] = shippingAddress;
-  //     }
-
-  //     final response = await http.post(
-  //       Uri.parse('$baseUrl/cart/checkout/'),
-  //       headers: {'Content-Type': 'application/json'},
-  //       body: jsonEncode(body),
-  //     );
-
-  //     if (response.statusCode == 200 || response.statusCode == 201) {
-  //       return jsonDecode(response.body);
-  //     }
-  //     return {'error': 'Failed to checkout'};
-  //   } catch (e) {
-  //     return {'error': e.toString()};
-  //   }
-  // }
-
   // ============= WISHLIST APIs =============
 
   static Future<List<dynamic>> getWishlist(int userId) async {
@@ -1062,51 +910,6 @@ class ApiService {
       return {'error': 'Failed to delete address'};
     } catch (e) {
       return {'error': e.toString()};
-    }
-  }
-
-  static Future<Map<String, dynamic>> createRazorpayOrder({
-    required int userId,
-    required double amount,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/create-razorpay-order'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'amount': amount}),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return {'success': false, 'error': 'Failed to create order'};
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  static Future<Map<String, dynamic>> verifyPayment({
-    required String razorpayOrderId,
-    required String razorpayPaymentId,
-    required String razorpaySignature,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/verify-payment'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'razorpay_order_id': razorpayOrderId,
-          'razorpay_payment_id': razorpayPaymentId,
-          'razorpay_signature': razorpaySignature,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return {'success': false, 'error': 'Payment verification failed'};
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
     }
   }
 }

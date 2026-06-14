@@ -8,8 +8,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:ecom_app/services/api_service.dart';
 import 'package:ecom_app/services/google_auth_service.dart';
 import 'package:ecom_app/shared/widgets/navbar.dart';
+import 'package:ecom_app/utils/google_button_setup.dart';
 // import 'package:ecom_app/features/admin/presentation/pages/admin_dashboard_page.dart';
-import 'package:universal_html/html.dart' as html;
 
 const Color kBrandRed = Color(0xFFE4252A);
 const Color kBrandRedSoft = Color(0xFFFFE5E6);
@@ -44,10 +44,7 @@ class _LoginPageState extends State<LoginPage> {
   void _renderGoogleButton() {
     Future.delayed(const Duration(milliseconds: 500), () {
       try {
-        final container = html.document.getElementById('google-signin-button');
-        if (container != null) {
-          debugPrint('Google Sign-In button container ready');
-        }
+        setupGoogleButtonContainer();
       } catch (e) {
         debugPrint('Error setting up Google button: $e');
       }
@@ -61,11 +58,7 @@ class _LoginPageState extends State<LoginPage> {
     if (email == _demoEmail && password == _demoPassword) {
       setState(() => isLoading = false);
       _showSnackBar(strings.welcomeBackToast, kBrandRed);
-      final userData = {
-        'id': 1,
-        'name': _demoName,
-        'email': _demoEmail,
-      };
+      final userData = {'id': 1, 'name': _demoName, 'email': _demoEmail};
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -118,7 +111,8 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        if (serverError.contains('email') || serverError.contains('not found')) {
+        if (serverError.contains('email') ||
+            serverError.contains('not found')) {
           _showSnackBar(strings.emailNotRegistered, Colors.blueGrey);
         } else if (serverError.contains('password') ||
             serverError.contains('credentials')) {

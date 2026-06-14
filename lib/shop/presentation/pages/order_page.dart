@@ -1,7 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:ecom_app/services/api_service.dart';
+import 'package:ecom_app/services/order_service.dart';
 
 // ── Theme constants ───────────────────────────────────────────────────────────
 
@@ -108,30 +108,19 @@ class OrderModel {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 Future<List<OrderModel>> fetchOrders(int userId) async {
-  final res = await http
-      .get(Uri.parse('${ApiService.baseUrl}/orders/$userId/'))
-      .timeout(const Duration(seconds: 30));
-
-  if (res.statusCode == 200) {
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) {
-      throw Exception('Unexpected orders response');
-    }
-
-    final List data = decoded;
-    return data.map((e) => OrderModel.fromJson(e)).toList();
-  }
-
-  throw Exception('Failed to load orders (${res.statusCode})');
+  await Future.delayed(const Duration(milliseconds: 200));
+  return OrderService()
+      .ordersForUser(userId)
+      .map((order) => OrderModel.fromJson(order))
+      .toList();
 }
 
 Future<bool> cancelOrder(int orderId, int userId) async {
-  final res = await http.patch(
-    Uri.parse('${ApiService.baseUrl}/orders/$orderId/cancel/'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'user_id': userId}),
-  );
-  return res.statusCode == 200;
+  return OrderService().cancelOrder(orderId, userId);
+}
+
+Future<bool> deliverOrder(int orderId, int userId) async {
+  return OrderService().deliverOrder(orderId, userId);
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -147,16 +136,22 @@ class _OrderPageState extends State<OrderPage>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
   late Future<List<OrderModel>> _future;
+  late final StreamSubscription<void> _orderSubscription;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
     _future = fetchOrders(widget.userId);
+    _orderSubscription = OrderService().orderChangeStream.listen((event) {
+      if (!mounted) return;
+      _load();
+    });
   }
 
   @override
   void dispose() {
+    _orderSubscription.cancel();
     _tab.dispose();
     super.dispose();
   }
@@ -171,7 +166,9 @@ class _OrderPageState extends State<OrderPage>
   List<OrderModel> _filter(List<OrderModel> all, int tab) {
     if (tab == 1) return all.where((o) => o.status == 'cancelled').toList();
     if (tab == 2) return all.where((o) => o.status == 'delivered').toList();
-    return all.where((o) => o.status != 'cancelled').toList();
+    return all
+        .where((o) => o.status != 'cancelled' && o.status != 'delivered')
+        .toList();
   }
 
   @override
@@ -300,7 +297,8 @@ class _OrderPageState extends State<OrderPage>
                       child: ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                         itemCount: list.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 14),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 14),
                         itemBuilder: (_, idx) => _OrderCard(
                           userId: widget.userId,
                           order: list[idx],
@@ -542,25 +540,47 @@ class _OrderCard extends StatelessWidget {
             ),
           ],
         ),
-        const Spacer(),
-        if (order.status != 'cancelled' && order.status != 'delivered') ...[
-          _PillBtn(
-            label: 'Track',
-            icon: Icons.local_shipping_outlined,
-            color: const Color(0xFF1565C0),
-            filled: true,
-            onTap: () => _showTracking(context),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _PillBtn(
+                label: 'Details',
+                icon: Icons.list_alt_rounded,
+                color: kTextDark,
+                filled: false,
+                onTap: () => _showDetails(context),
+              ),
+              if (order.status != 'cancelled' && order.status != 'delivered')
+                _PillBtn(
+                  label: 'Track',
+                  icon: Icons.local_shipping_outlined,
+                  color: const Color(0xFF1565C0),
+                  filled: true,
+                  onTap: () => _showTracking(context),
+                ),
+              if (order.status != 'cancelled' && order.status != 'delivered')
+                _PillBtn(
+                  label: 'Deliver',
+                  icon: Icons.task_alt_rounded,
+                  color: const Color(0xFF1DB954),
+                  filled: true,
+                  onTap: () => _markDelivered(context),
+                ),
+              if (order.canCancel)
+                _PillBtn(
+                  label: 'Cancel',
+                  icon: Icons.cancel_outlined,
+                  color: kBrandRed,
+                  filled: false,
+                  onTap: () => _confirmCancel(context),
+                ),
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
-        if (order.canCancel)
-          _PillBtn(
-            label: 'Cancel',
-            icon: Icons.cancel_outlined,
-            color: kBrandRed,
-            filled: false,
-            onTap: () => _confirmCancel(context),
-          ),
+        ),
       ],
     ),
   );
@@ -572,6 +592,34 @@ class _OrderCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => _TrackingSheet(order: order),
     );
+  }
+
+  void _showDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OrderDetailsSheet(order: order),
+    );
+  }
+
+  Future<void> _markDelivered(BuildContext context) async {
+    final success = await deliverOrder(order.id, userId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Order #${order.id} delivered' : 'Could not update order',
+          ),
+          backgroundColor: success ? const Color(0xFF1DB954) : Colors.grey,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      if (success) onRefresh();
+    }
   }
 
   Future<void> _confirmCancel(BuildContext context) async {
@@ -682,6 +730,216 @@ class _OrderCard extends StatelessWidget {
   }
 }
 
+class _OrderDetailsSheet extends StatelessWidget {
+  final OrderModel order;
+  const _OrderDetailsSheet({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final isCod = order.paymentMethod == 'cod';
+    final fullName = '${order.firstName} ${order.lastName}'.trim();
+    final addressLine2 = order.addressLine2.isNotEmpty
+        ? ', ${order.addressLine2}'
+        : '';
+    final address =
+        '${order.addressLine1}$addressLine2, ${order.city}, ${order.state} - ${order.postalCode}, ${order.country}';
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.82,
+      minChildSize: 0.45,
+      maxChildSize: 0.94,
+      builder: (context, controller) => Container(
+        decoration: const BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: kBrandRed.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_rounded,
+                    color: kBrandRed,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order #${order.id}',
+                        style: const TextStyle(
+                          color: kTextDark,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.totalItems} item${order.totalItems != 1 ? 's' : ''}',
+                        style: const TextStyle(color: kTextMuted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusChip(status: order.status),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _DetailInfoTile(
+              icon: isCod ? Icons.payments_rounded : Icons.verified_rounded,
+              title: isCod ? 'Payment Pending' : 'Payment Approved',
+              value: isCod ? 'Cash on Delivery' : 'Paid via UPI',
+              color: isCod ? const Color(0xFFE9A100) : const Color(0xFF1DB954),
+            ),
+            const SizedBox(height: 12),
+            _DetailInfoTile(
+              icon: Icons.location_on_outlined,
+              title: fullName.isEmpty ? 'Delivery Address' : fullName,
+              value: address,
+              color: kBrandRed,
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Products',
+              style: TextStyle(
+                color: kTextDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...order.items.map(
+              (item) => Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: kSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kBorder),
+                ),
+                child: _ItemRow(item: item),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: kBrandRed.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total Amount',
+                    style: TextStyle(
+                      color: kTextDark,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '₹${order.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: kBrandRed,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailInfoTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+
+  const _DetailInfoTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: kTextDark,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // ── Item Row ──────────────────────────────────────────────────────────────────
 class _ItemRow extends StatelessWidget {
   final OrderItemModel item;
@@ -706,7 +964,8 @@ class _ItemRow extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder(),
+                      errorBuilder: (context, error, stackTrace) =>
+                          _placeholder(),
                     )
                   : _placeholder(),
             ),

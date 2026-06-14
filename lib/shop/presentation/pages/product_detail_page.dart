@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ecom_app/models/product_model.dart';
-import 'package:ecom_app/services/api_service.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/shop/presentation/pages/cart_page.dart';
 
@@ -56,8 +55,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return;
     }
 
-    product = await ApiService.getProductDetail(widget.productId);
+    Product? localProduct;
+    for (final item in staticProducts) {
+      if (item.id == widget.productId) {
+        localProduct = item;
+        break;
+      }
+    }
+
     setState(() {
+      product = localProduct;
       isLoading = false;
     });
   }
@@ -92,18 +99,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
 
     setState(() => isAddingToCart = false);
-
-    final synced = await ApiService.addToCart(
-      userId: widget.userData['id'],
-      productId: currentProduct.id,
-    ).timeout(const Duration(seconds: 2), onTimeout: () => false);
-
-    if (synced && CartService().isInLocalCart(currentProduct.id)) {
-      CartService().removeLocalProduct(currentProduct.id);
-      CartService().notifyCartChange(
-        CartChangeEvent(productId: currentProduct.id, isAdded: true),
-      );
-    }
   }
 
   PreferredSizeWidget _buildAppBar() {

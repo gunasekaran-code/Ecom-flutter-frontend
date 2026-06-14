@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:ecom_app/models/product_model.dart';
-import 'package:ecom_app/services/api_service.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/services/wishlist_service.dart';
 import 'package:ecom_app/shop/presentation/pages/home_page.dart';
@@ -64,37 +63,9 @@ class _WishlistPageState extends State<WishlistPage> {
       wishlistItems = localItems;
       isLoading = false;
     });
-
-    // Backend wishlist fetch disabled for static wishlist mode.
-    // try {
-    //   final items = await ApiService.getWishlist(
-    //     widget.userData['id'],
-    //   ).timeout(const Duration(seconds: 2), onTimeout: () => []);
-    //   final apiItems = List<Map<String, dynamic>>.from(items);
-    //   final mergedLocalItems = WishlistService().localWishlistProducts
-    //       .map((product) => product.toWishlistItem())
-    //       .where(
-    //         (localItem) => !apiItems.any(
-    //           (apiItem) => apiItem['product_id'] == localItem['product_id'],
-    //         ),
-    //       )
-    //       .toList();
-    //
-    //   setState(() {
-    //     wishlistItems = [...apiItems, ...mergedLocalItems];
-    //     isLoading = false;
-    //   });
-    // } catch (e) {
-    //   setState(() => isLoading = false);
-    // }
   }
 
   Future<void> _removeFromWishlist(int productId) async {
-    // Backend wishlist remove disabled for static wishlist mode.
-    // final success = await ApiService.removeFromWishlist(
-    //   userId: widget.userData['id'],
-    //   productId: productId,
-    // );
     WishlistService().removeLocalProduct(productId);
     setState(() {
       wishlistItems.removeWhere((item) => item['product_id'] == productId);
@@ -123,21 +94,30 @@ class _WishlistPageState extends State<WishlistPage> {
   Future<void> _moveToCart(Map<String, dynamic> item) async {
     final productId = item['product_id'] as int;
     try {
-      final success = await ApiService.addToCart(
-        userId: widget.userData['id'],
-        productId: productId,
+      final product = Product(
+        id: productId,
+        name: item['product_name'] ?? 'Product',
+        description: item['description'] ?? '',
+        price: double.tryParse(item['price'].toString()) ?? 0,
+        category: item['category'] ?? 'Unknown',
+        imageUrl: item['image'],
+        images: [
+          if (item['image'] != null && item['image'].toString().isNotEmpty)
+            item['image'].toString(),
+        ],
+        stock: (item['stock'] as num?)?.toInt() ?? 1,
+        rating: double.tryParse(item['rating'].toString()) ?? 0,
+        delFlag: false,
+        isInStock: item['is_in_stock'] ?? true,
+        createdAt: DateTime.now().toIso8601String(),
       );
 
-      // 1. Change the throw message to be user-friendly
-      if (!success) {
+      if (!product.isInStock || product.stock < 1) {
         throw 'This product is currently out of stock.';
       }
 
-      // Backend wishlist remove disabled for static wishlist mode.
-      // final removed = await ApiService.removeFromWishlist(
-      //   userId: widget.userData['id'],
-      //   productId: productId,
-      // );
+      CartService().addLocalProduct(product);
+
       const removed = true;
 
       if (removed) {

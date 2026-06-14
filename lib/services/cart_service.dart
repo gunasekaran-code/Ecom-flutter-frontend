@@ -69,6 +69,13 @@ class CartService {
     notifyCartChange(CartChangeEvent(productId: productId, isAdded: false));
   }
 
+  void removeLocalProducts(Iterable<int> productIds) {
+    for (final productId in productIds) {
+      _localCartItems.remove(productId);
+    }
+    notifyCartChange(CartChangeEvent(productId: 0, isAdded: false));
+  }
+
   void notifyCartChange(CartChangeEvent event) {
     _cartChangeController.add(event);
   }
