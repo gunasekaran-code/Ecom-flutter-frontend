@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ecom_app/core/localization/app_strings.dart';
 import 'package:ecom_app/core/localization/app_language.dart';
-
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-const Color kSurface = Color(0xFFF7F7F9);
-const Color kBorder = Color(0xFFEAEAEA);
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 
 class LanguagePage extends StatefulWidget {
   const LanguagePage({super.key});

@@ -1,19 +1,7 @@
 import 'dart:async';
-
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:ecom_app/services/order_service.dart';
-
-// ── Theme constants ───────────────────────────────────────────────────────────
-
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kBrandRedDark = Color(0xFFB81E22);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-const Color kBg = Color(0xFFF5F5F5);
-const Color kCard = Colors.white;
-const Color kSurface = Color(0xFFF7F7F9);
-const Color kCardBorder = Color(0xFFEDEDF0);
-const Color kBorder = Color(0xFFEAEAEA);
 
 // ── Models ────────────────────────────────────────────────────────────────────
 class OrderItemModel {

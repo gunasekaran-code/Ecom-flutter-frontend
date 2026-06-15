@@ -4,12 +4,6 @@ import 'package:ecom_app/auth/pages/login_page.dart';
 import 'package:ecom_app/shared/widgets/shared_ui.dart';
 import 'package:ecom_app/services/api_service.dart';
 
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kBrandRedSoft = Color(0xFFFFE5E6);
-const Color kBgLight = Color(0xFFFDF7F7);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 

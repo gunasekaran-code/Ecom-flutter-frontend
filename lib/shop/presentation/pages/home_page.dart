@@ -5,13 +5,9 @@ import 'package:ecom_app/services/wishlist_service.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/shop/presentation/pages/product_detail_page.dart';
 import 'package:ecom_app/shop/presentation/pages/cart_page.dart';
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 import 'dart:async';
 
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kBrandRedSoft = Color(0xFFFFE5E6);
-const Color kBgLight = Color(0xFFFDF7F7);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData;

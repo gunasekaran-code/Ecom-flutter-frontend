@@ -1,11 +1,32 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// Brand red used across the app
+// ── Global Brand Colors ─────────────────────────────────────────────────────
 const Color kBrandRed = Color(0xFFE4252A);
+const Color kBrandRedDark = Color(0xFFB81E22);
 const Color kBrandRedSoft = Color(0xFFFFE5E6);
 
-/// A reusable scaffold with a soft light background and red glowing orbs
+const Color kTextDark = Color(0xFF1A1A1A);
+const Color kTextMuted = Color(0xFF6B6B6B);
+
+const Color kBackground = Colors.white;
+const Color kBg = Color(0xFFF5F5F5);
+const Color kCard = Colors.white;
+const Color kSurface = Color(0xFFF7F7F9);
+const Color kCardBorder = Color(0xFFEDEDF0);
+const Color kBorder = Color(0xFFEAEAEA);
+const Color kBgLight = Color(0xFFFDF7F7);
+
+// ── Status colors (used for chips, badges, payment states) ──────────────────
+const Color kStatusPlaced = Color(0xFF1565C0);
+const Color kStatusConfirmed = Color(0xFF6A1B9A);
+const Color kStatusShipped = Color(0xFFF57C00);
+const Color kStatusOutForDelivery = Color(0xFF00838F);
+const Color kStatusDelivered = Color(0xFF1DB954);
+const Color kStatusPending = Color(0xFFE9A100);
+
+// ── Reusable Widgets (from GlassScaffold file) ───────────────────────────────
+
 class GlassScaffold extends StatelessWidget {
   final Widget child;
   final String title;
@@ -14,10 +35,9 @@ class GlassScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDF7F7), // Soft warm white
+      backgroundColor: const Color(0xFFFDF7F7),
       body: Stack(
         children: [
-          // Top Left Red Glow Orb
           Positioned(
             top: -120,
             left: -120,
@@ -30,7 +50,6 @@ class GlassScaffold extends StatelessWidget {
               ),
             ),
           ),
-          // Bottom Right Soft Pink Orb
           Positioned(
             bottom: -160,
             right: -80,
@@ -43,7 +62,6 @@ class GlassScaffold extends StatelessWidget {
               ),
             ),
           ),
-          // Accent middle orb
           Positioned(
             top: 200,
             right: -60,
@@ -56,12 +74,10 @@ class GlassScaffold extends StatelessWidget {
               ),
             ),
           ),
-          // Blur layer to diffuse the orbs
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
             child: Container(color: Colors.white.withOpacity(0.1)),
           ),
-          // Main Content
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -76,7 +92,6 @@ class GlassScaffold extends StatelessWidget {
   }
 }
 
-/// The frosted glass card — light variant
 class GlassCard extends StatelessWidget {
   final Widget child;
   const GlassCard({super.key, required this.child});
@@ -117,7 +132,6 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-/// A custom text field tailored for the light glassmorphism theme
 class GlassTextField extends StatelessWidget {
   final String hintText;
   final IconData icon;
@@ -137,7 +151,7 @@ class GlassTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: isPassword,
-      style: const TextStyle(color: Color(0xFF1A1A1A)),
+      style: const TextStyle(color: kTextDark),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.black.withOpacity(0.45)),

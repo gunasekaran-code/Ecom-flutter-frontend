@@ -11,11 +11,7 @@ import 'package:ecom_app/shared/widgets/navbar.dart';
 import 'package:ecom_app/utils/google_button_setup.dart';
 // import 'package:ecom_app/features/admin/presentation/pages/admin_dashboard_page.dart';
 
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kBrandRedSoft = Color(0xFFFFE5E6);
-const Color kBgLight = Color(0xFFFDF7F7);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

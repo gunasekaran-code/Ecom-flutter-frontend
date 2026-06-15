@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:ecom_app/auth/pages/login_page.dart'
     show LoginPage;
 import 'package:ecom_app/services/api_service.dart';

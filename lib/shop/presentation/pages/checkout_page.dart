@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/services/order_service.dart';
 import 'package:ecom_app/pages/payment_success_page.dart';
-
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-const Color kSurface = Color(0xFFF7F7F7);
-const Color kBorder = Color(0xFFEAEAEA);
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 
 class CheckoutPage extends StatefulWidget {
   final int userId;
@@ -35,7 +30,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'id': 1,
       'address_type': 'home',
       'first_name': 'Guna',
-      'last_name': 'Kumar',
+      'last_name': 'Sekaran',
       'address_line_1': '12 Sports Academy Street',
       'address_line_2': 'Near Main Ground',
       'city': 'Chennai',

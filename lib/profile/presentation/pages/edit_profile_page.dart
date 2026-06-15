@@ -1,18 +1,9 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-
 import 'package:ecom_app/services/api_service.dart';
-
-// ===== Brand Colors =====
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kBrandRedDark = Color(0xFFB81E22);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-const Color kSurface = Color(0xFFF7F7F9);
-const Color kCardBorder = Color(0xFFEDEDF0);
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;

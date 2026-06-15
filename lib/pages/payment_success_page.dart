@@ -1,10 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:ecom_app/services/cart_service.dart';
-
-const Color _kTextDark = Color(0xFF1A1A1A);
-const Color _kTextMuted = Color(0xFF6B6B6B);
-const Color _kBorder = Color(0xFFEAEAEA);
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   final String title;
@@ -354,7 +351,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                   Text(
                     widget.title,
                     style: const TextStyle(
-                      color: _kTextDark,
+                      color: kTextDark,
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.5,
@@ -502,7 +499,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
-                        _kBorder,
+                        kBorder,
                         Colors.transparent,
                       ],
                     ),
@@ -515,7 +512,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     const Text(
                       'Grand Total',
                       style: TextStyle(
-                        color: _kTextDark,
+                        color: kTextDark,
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
@@ -558,7 +555,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                       Text(
                         '${widget.itemsCount} item${widget.itemsCount == 1 ? '' : 's'}',
                         style: const TextStyle(
-                          color: _kTextMuted,
+                          color: kTextMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -586,14 +583,14 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
         children: [
           Text(
             label,
-            style: TextStyle(color: _kTextMuted, fontSize: isSmall ? 12 : 14),
+            style: TextStyle(color: kTextMuted, fontSize: isSmall ? 12 : 14),
           ),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.right,
               style: TextStyle(
-                color: valueColor ?? _kTextDark,
+                color: valueColor ?? kTextDark,
                 fontSize: isSmall ? 12 : 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -645,7 +642,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                 const Text(
                   'Delivering To',
                   style: TextStyle(
-                    color: _kTextDark,
+                    color: kTextDark,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -654,7 +651,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                 Text(
                   _resolvedAddressText,
                   style: const TextStyle(
-                    color: _kTextMuted,
+                    color: kTextMuted,
                     fontSize: 12.5,
                     height: 1.4,
                   ),
@@ -690,7 +687,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
           const Text(
             'Order Items',
             style: TextStyle(
-              color: _kTextDark,
+              color: kTextDark,
               fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
@@ -713,12 +710,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.image_outlined,
-                                color: _kTextMuted,
+                                color: kTextMuted,
                               ),
                             )
                           : const Icon(
                               Icons.image_outlined,
-                              color: _kTextMuted,
+                              color: kTextMuted,
                             ),
                     ),
                   ),
@@ -732,7 +729,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: _kTextDark,
+                            color: kTextDark,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -740,7 +737,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         Text(
                           'Qty ${item['quantity']}',
                           style: const TextStyle(
-                            color: _kTextMuted,
+                            color: kTextMuted,
                             fontSize: 12,
                           ),
                         ),
@@ -750,7 +747,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                   Text(
                     '₹${(((item['price'] as num?) ?? 0) * ((item['quantity'] as num?) ?? 0)).toStringAsFixed(2)}',
                     style: const TextStyle(
-                      color: _kTextDark,
+                      color: kTextDark,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),

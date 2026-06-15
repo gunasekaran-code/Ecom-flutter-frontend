@@ -1,16 +1,8 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-
 import 'package:ecom_app/services/cart_service.dart';
 import 'package:ecom_app/shop/presentation/pages/checkout_page.dart';
-
-const Color kBrandRed = Color(0xFFE4252A);
-const Color kTextDark = Color(0xFF1A1A1A);
-const Color kTextMuted = Color(0xFF6B6B6B);
-const Color kBackground = Colors.white;
-const Color kSurface = Color(0xFFF7F7F7);
-const Color kBorder = Color(0xFFEAEAEA);
+import 'package:ecom_app/shared/widgets/shared_ui.dart';
 
 class CartPage extends StatefulWidget {
   final int userId;
