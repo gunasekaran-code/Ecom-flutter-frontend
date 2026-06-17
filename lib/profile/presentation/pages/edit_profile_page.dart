@@ -230,6 +230,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
+    // ── Show confirmation dialog before saving ──────────────────────
+    final confirmed = await showSaveProfileDialog(context);
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isLoading = true);
 
     final result = await ApiService.updateUser(
