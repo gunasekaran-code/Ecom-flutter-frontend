@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:ecom_app/shop/presentation/pages/order_page.dart';
 
 // ── Global Brand Colors ─────────────────────────────────────────────────────
 const Color kBrandRed = Color(0xFFE4252A);
@@ -173,4 +174,137 @@ class GlassTextField extends StatelessWidget {
       ),
     );
   }
+}
+
+
+Future<bool> showCancelOrderDialog(BuildContext context) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: kBrandRed.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: kBrandRed,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'Cancel Order',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: kTextDark,
+              fontSize: 17,
+            ),
+          ),
+        ],
+      ),
+      content: const Text(
+        'Are you sure you want to cancel this order?',
+        style: TextStyle(color: kTextMuted, fontSize: 14, height: 1.4),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text(
+            'No',
+            style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w600),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kBrandRed,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text(
+            'Yes, Cancel',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
+
+/// Shows a cancel result snackbar.
+void showCancelSnackBar(BuildContext context, {required bool success, required String orderId}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        success ? 'Order #$orderId cancelled' : 'Could not cancel order',
+      ),
+      backgroundColor: success ? kBrandRed : Colors.grey,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
+
+
+// shared_ui.dart
+Future<bool> showRemoveCartItemDialog(BuildContext context) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: kBrandRed.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.delete_outline, color: kBrandRed, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'Remove Item',
+            style: TextStyle(fontWeight: FontWeight.w700, color: kTextDark, fontSize: 17),
+          ),
+        ],
+      ),
+      content: const Text(
+        'Remove this item from your cart?',
+        style: TextStyle(color: kTextMuted, fontSize: 14, height: 1.4),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('No', style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w600)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kBrandRed,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Remove', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
 }

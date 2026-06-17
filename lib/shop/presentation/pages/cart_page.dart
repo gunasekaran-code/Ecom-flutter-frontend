@@ -420,7 +420,14 @@ class _CartPageState extends State<CartPage> {
                                           ),
                                         ),
                                         GestureDetector(
-                                          onTap: () => removeItem(index - 1),
+                                          onTap: () async {
+                                            final confirmed =
+                                                await showRemoveCartItemDialog(
+                                                  context,
+                                                );
+                                            if (confirmed)
+                                              removeItem(index - 1);
+                                          },
                                           child: const Icon(
                                             Icons.close,
                                             size: 18,
