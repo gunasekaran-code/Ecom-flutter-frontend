@@ -10,6 +10,7 @@ import 'package:ecom_app/core/localization/app_strings.dart';
 import 'package:ecom_app/auth/pages/forgot_password.dart';
 import 'package:ecom_app/auth/pages/login_page.dart';
 import 'package:ecom_app/auth/pages/reset_password.dart';
+import 'package:ecom_app/splash/splash_screen.dart'; // ← NEW
 
 void main() {
   runApp(const MyApp());
@@ -18,7 +19,6 @@ void main() {
 class _ResetPasswordLink {
   final String token;
   final String email;
-
   const _ResetPasswordLink({required this.token, required this.email});
 }
 
@@ -34,38 +34,24 @@ class _MyAppState extends State<MyApp> {
       AppLanguageController.instance;
 
   late final Future<void> _loadSettings;
-
-  // Navigator Key
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-  // Deep Link Subscription
   StreamSubscription<Uri>? _sub;
   _ResetPasswordLink? _pendingResetLink;
 
   @override
   void initState() {
     super.initState();
-
     _loadSettings = _languageController.load();
-
     handleDeepLink(Uri.base.toString());
     initDeepLinks();
   }
 
-  // =========================
-  // Deep Link Setup
-  // =========================
-
   Future<void> initDeepLinks() async {
     try {
-      // App opened from terminated state
       final initialLink = await AppLinks().getInitialLink();
-
       if (initialLink != null) {
         handleDeepLink(initialLink.toString());
       }
-
-      // App opened from background
       _sub = AppLinks().uriLinkStream.listen((Uri uri) {
         handleDeepLink(uri.toString());
       });
@@ -74,18 +60,11 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // =========================
-  // Handle Deep Link
-  // =========================
-
   void handleDeepLink(String link) {
     debugPrint("Deep Link: $link");
-
     final uri = Uri.parse(link);
-
     final token = uri.queryParameters['token'];
     final email = Uri.decodeComponent(uri.queryParameters['email'] ?? '');
-
     debugPrint("Token: $token");
     debugPrint("Email: $email");
 
@@ -105,12 +84,10 @@ class _MyAppState extends State<MyApp> {
 
   void _openResetPassword({required String token, required String email}) {
     final navigator = navigatorKey.currentState;
-
     if (navigator == null) {
       _pendingResetLink = _ResetPasswordLink(token: token, email: email);
       return;
     }
-
     _pendingResetLink = null;
     navigator.pushAndRemoveUntil(
       MaterialPageRoute(
@@ -127,7 +104,6 @@ class _MyAppState extends State<MyApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final latestPendingResetLink = _pendingResetLink;
       if (latestPendingResetLink == null || !mounted) return;
-
       _openResetPassword(
         token: latestPendingResetLink.token,
         email: latestPendingResetLink.email,
@@ -148,9 +124,10 @@ class _MyAppState extends State<MyApp> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done &&
             !_languageController.isReady) {
+          // ← NEW: show branded splash while settings load (replaces plain spinner)
           return const MaterialApp(
             debugShowCheckedModeBanner: false,
-            home: Scaffold(body: Center(child: CircularProgressIndicator())),
+            home: SplashScreen(),
           );
         }
 
@@ -159,32 +136,31 @@ class _MyAppState extends State<MyApp> {
           builder: (context, _) {
             final language = _languageController.current;
             final initialResetLink = _resetLinkFromUri(Uri.base);
-            final home = initialResetLink == null
-                ? const LoginPage()
-                : ResetPasswordPage(
+
+            // ← NEW: splash is the default home; deep link overrides it
+            final home = initialResetLink != null
+                ? ResetPasswordPage(
                     token: initialResetLink.token,
                     email: initialResetLink.email,
-                  );
+                  )
+                : const SplashScreen(); // ← was LoginPage
+
             _openPendingResetLink();
 
             return MaterialApp(
               navigatorKey: navigatorKey,
               debugShowCheckedModeBanner: false,
-
               locale: language.locale,
-
               supportedLocales: AppLanguages.all
                   .map((option) => option.locale)
                   .toSet()
                   .toList(),
-
               localizationsDelegates: const [
                 AppStrings.delegate,
                 GlobalMaterialLocalizations.delegate,
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-
               theme: ThemeData(fontFamily: language.fontFamily),
               builder: (context, child) {
                 return DefaultTextStyle.merge(
@@ -195,12 +171,9 @@ class _MyAppState extends State<MyApp> {
                   child: child ?? const SizedBox.shrink(),
                 );
               },
-
               home: home,
-
               routes: {
                 '/LoginPage': (context) => const LoginPage(),
-
                 '/ForgotPasswordPage': (context) => const ForgotPasswordPage(),
               },
             );
@@ -215,7 +188,6 @@ class _MyAppState extends State<MyApp> {
     if (!_isResetPasswordLink(uri) || token == null || token.isEmpty) {
       return null;
     }
-
     return _ResetPasswordLink(
       token: token,
       email: Uri.decodeComponent(uri.queryParameters['email'] ?? ''),
