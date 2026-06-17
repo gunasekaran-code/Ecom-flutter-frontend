@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:ecom_app/core/localization/app_strings.dart';
-import 'package:ecom_app/auth/pages/forgot_password.dart';
-import 'package:ecom_app/auth/pages/register_page.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
+import 'package:wss_sports/auth/pages/forgot_password.dart';
+import 'package:wss_sports/auth/pages/register_page.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:ecom_app/services/api_service.dart';
-import 'package:ecom_app/services/google_auth_service.dart';
-import 'package:ecom_app/shared/widgets/navbar.dart';
-import 'package:ecom_app/utils/google_button_setup.dart';
-// import 'package:ecom_app/features/admin/presentation/pages/admin_dashboard_page.dart';
+import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/services/google_auth_service.dart';
+import 'package:wss_sports/shared/widgets/navbar.dart';
+import 'package:wss_sports/utils/google_button_setup.dart';
+// import 'package:wss_sports/features/admin/presentation/pages/admin_dashboard_page.dart';
 
 
 

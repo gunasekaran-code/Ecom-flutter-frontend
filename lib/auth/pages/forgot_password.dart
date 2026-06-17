@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/auth/pages/login_page.dart'
+import 'package:wss_sports/auth/pages/login_page.dart'
     show LoginPage;
-import 'package:ecom_app/services/api_service.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});

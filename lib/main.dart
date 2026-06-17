@@ -4,13 +4,13 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'package:ecom_app/core/localization/app_language.dart';
-import 'package:ecom_app/core/localization/app_strings.dart';
+import 'package:wss_sports/core/localization/app_language.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
 
-import 'package:ecom_app/auth/pages/forgot_password.dart';
-import 'package:ecom_app/auth/pages/login_page.dart';
-import 'package:ecom_app/auth/pages/reset_password.dart';
-import 'package:ecom_app/splash/splash_screen.dart'; // ← NEW
+import 'package:wss_sports/auth/pages/forgot_password.dart';
+import 'package:wss_sports/auth/pages/login_page.dart';
+import 'package:wss_sports/auth/pages/reset_password.dart';
+import 'package:wss_sports/splash/splash_screen.dart'; // ← NEW
 
 void main() {
   runApp(const MyApp());

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ecom_app/models/product_model.dart';
+import 'package:wss_sports/models/product_model.dart';
 
 class WishlistService {
   static final WishlistService _instance = WishlistService._internal();

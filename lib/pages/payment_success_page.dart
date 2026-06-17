@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:ecom_app/services/cart_service.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/cart_service.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   final String title;

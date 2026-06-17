@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:ecom_app/models/product_model.dart';
+import 'package:wss_sports/models/product_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 

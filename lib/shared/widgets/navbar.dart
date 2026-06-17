@@ -1,10 +1,10 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:ecom_app/core/localization/app_strings.dart';
-import 'package:ecom_app/shop/presentation/pages/home_page.dart';
-import 'package:ecom_app/shop/presentation/pages/order_page.dart';
-import 'package:ecom_app/shop/presentation/pages/wishlist_page.dart';
-import 'package:ecom_app/profile/presentation/pages/profile_page.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
+import 'package:wss_sports/shop/presentation/pages/home_page.dart';
+import 'package:wss_sports/shop/presentation/pages/order_page.dart';
+import 'package:wss_sports/shop/presentation/pages/wishlist_page.dart';
+import 'package:wss_sports/profile/presentation/pages/profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
   final Map<String, dynamic> userData;

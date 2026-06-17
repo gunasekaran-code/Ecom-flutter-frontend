@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:ecom_app/services/order_service.dart';
+import 'package:wss_sports/services/order_service.dart';
 
 // ── Models ────────────────────────────────────────────────────────────────────
 class OrderItemModel {

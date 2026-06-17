@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/core/localization/app_strings.dart';
-import 'package:ecom_app/core/localization/app_language.dart';
-import 'package:ecom_app/services/api_service.dart';
-import 'package:ecom_app/profile/presentation/pages/edit_profile_page.dart';
-import 'package:ecom_app/settings/presentation/pages/language_page.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
+import 'package:wss_sports/core/localization/app_language.dart';
+import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/profile/presentation/pages/edit_profile_page.dart';
+import 'package:wss_sports/settings/presentation/pages/language_page.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;

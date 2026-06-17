@@ -1,6 +1,6 @@
 {
-    "name": "ecom_app",
-    "short_name": "ecom_app",
+    "name": "wss_sports",
+    "short_name": "wss_sports",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/services/cart_service.dart';
-import 'package:ecom_app/services/order_service.dart';
-import 'package:ecom_app/pages/payment_success_page.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/cart_service.dart';
+import 'package:wss_sports/services/order_service.dart';
+import 'package:wss_sports/pages/payment_success_page.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class CheckoutPage extends StatefulWidget {
   final int userId;

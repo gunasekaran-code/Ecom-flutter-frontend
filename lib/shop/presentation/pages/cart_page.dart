@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:ecom_app/services/cart_service.dart';
-import 'package:ecom_app/shop/presentation/pages/checkout_page.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/cart_service.dart';
+import 'package:wss_sports/shop/presentation/pages/checkout_page.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class CartPage extends StatefulWidget {
   final int userId;

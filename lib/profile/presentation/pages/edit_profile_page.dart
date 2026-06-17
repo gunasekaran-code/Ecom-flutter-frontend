@@ -2,8 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:ecom_app/services/api_service.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/core/localization/app_strings.dart';
-import 'package:ecom_app/models/product_model.dart';
-import 'package:ecom_app/services/wishlist_service.dart';
-import 'package:ecom_app/services/cart_service.dart';
-import 'package:ecom_app/shop/presentation/pages/product_detail_page.dart';
-import 'package:ecom_app/shop/presentation/pages/cart_page.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
+import 'package:wss_sports/models/product_model.dart';
+import 'package:wss_sports/services/wishlist_service.dart';
+import 'package:wss_sports/services/cart_service.dart';
+import 'package:wss_sports/shop/presentation/pages/product_detail_page.dart';
+import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'dart:async';
 
 

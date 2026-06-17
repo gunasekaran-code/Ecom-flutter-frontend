@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class PaymentFailedPage extends StatefulWidget {
   final String title;

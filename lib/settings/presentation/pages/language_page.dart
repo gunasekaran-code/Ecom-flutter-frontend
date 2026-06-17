@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:ecom_app/core/localization/app_strings.dart';
-import 'package:ecom_app/core/localization/app_language.dart';
-import 'package:ecom_app/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/core/localization/app_strings.dart';
+import 'package:wss_sports/core/localization/app_language.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
 class LanguagePage extends StatefulWidget {
   const LanguagePage({super.key});
