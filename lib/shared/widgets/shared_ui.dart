@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:ecom_app/profile/presentation/pages/profile_page.dart';
 
 // ── Global Brand Colors ─────────────────────────────────────────────────────
 const Color kBrandRed = Color(0xFFE4252A);
