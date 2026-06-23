@@ -148,11 +148,12 @@ class _CartPageState extends State<CartPage> {
     final productId = cartItems[index]['product_id'];
 
     if (availableStock < 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This product is out of stock'),
-          duration: Duration(seconds: 2),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Alert',
+        message: 'This product is out of stock',
+        type: AppSnackBarType.alert,
+        duration: const Duration(seconds: 2),
       );
       return;
     }
@@ -162,11 +163,12 @@ class _CartPageState extends State<CartPage> {
         .toInt();
 
     if (delta > 0 && currentQuantity >= availableStock) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Only $availableStock item(s) available in stock'),
-          duration: const Duration(seconds: 2),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Alert',
+        message: 'Only $availableStock item(s) available in stock',
+        type: AppSnackBarType.alert,
+        duration: const Duration(seconds: 2),
       );
       return;
     }
@@ -213,11 +215,12 @@ class _CartPageState extends State<CartPage> {
 
     CartService().removeLocalProduct(productId);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$productName removed from cart'),
-          duration: const Duration(seconds: 1),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Info',
+        message: '$productName removed from cart',
+        type: AppSnackBarType.info,
+        duration: const Duration(seconds: 1),
       );
     }
   }
@@ -250,9 +253,7 @@ class _CartPageState extends State<CartPage> {
         centerTitle: true,
       ),
       body: loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFE4252A)),
-            )
+          ? const ListContentSkeleton(itemCount: 4)
           : cartItems.isEmpty
           ? Center(
               child: Column(

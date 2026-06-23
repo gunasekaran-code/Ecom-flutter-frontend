@@ -209,12 +209,7 @@ class _OrderPageState extends State<OrderPage>
         future: _future,
         builder: (ctx, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: kBrandRed,
-                strokeWidth: 2.5,
-              ),
-            );
+            return const ListContentSkeleton(itemCount: 4);
           }
           if (snap.hasError) {
             return const _EmptyState(
@@ -594,17 +589,13 @@ class _OrderCard extends StatelessWidget {
   Future<void> _markDelivered(BuildContext context) async {
     final success = await deliverOrder(order.id, userId);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success ? 'Order #${order.id} delivered' : 'Could not update order',
-          ),
-          backgroundColor: success ? const Color(0xFF1DB954) : Colors.grey,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        title: success ? 'Success' : 'Error',
+        message: success
+            ? 'Order #${order.id} delivered'
+            : 'Could not update order',
+        type: success ? AppSnackBarType.success : AppSnackBarType.error,
       );
       if (success) onRefresh();
     }
@@ -616,7 +607,11 @@ class _OrderCard extends StatelessWidget {
 
     final success = await cancelOrder(order.id, userId);
     if (context.mounted) {
-      showCancelSnackBar(context, success: success, orderId: order.id.toString());
+      showCancelSnackBar(
+        context,
+        success: success,
+        orderId: order.id.toString(),
+      );
       if (success) onRefresh();
     }
   }

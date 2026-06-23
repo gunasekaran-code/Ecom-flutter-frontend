@@ -68,6 +68,22 @@ flutter:
     - assets/images/image3.jpg
     - assets/images/image4.jpg
     - assets/images/logo1.png
+  # fonts:
+  #   - family: PlusJakartaSans
+  #     fonts:
+  #       - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+  #       - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+  #         weight: 700
+          
+  #   - family: SFPro
+  #     fonts:
+  #       - asset: assets/fonts/SF-Pro-Display-Regular.otf
+  #       - asset: assets/fonts/SF-Pro-Display-Bold.otf
+  #         weight: 700
+          
+  #   - family: AndaleMono
+  #     fonts:
+  #       - asset: assets/fonts/AndaleMono.ttf
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

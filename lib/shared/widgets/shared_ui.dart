@@ -27,6 +27,129 @@ const Color kStatusPending = Color(0xFFE9A100);
 
 // ── Reusable Widgets (from GlassScaffold file) ───────────────────────────────
 
+enum AppSnackBarType { success, error, info, alert }
+
+void showAppSnackBar(
+  BuildContext context, {
+  required String title,
+  required String message,
+  AppSnackBarType type = AppSnackBarType.info,
+  Duration duration = const Duration(seconds: 3),
+}) {
+  final style = _snackBarStyle(type);
+
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        padding: EdgeInsets.zero,
+        margin: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+        duration: duration,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: style.color.withValues(alpha: 0.28)),
+            boxShadow: [
+              BoxShadow(
+                color: style.color.withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+            gradient: LinearGradient(
+              colors: [style.softColor, Colors.white.withValues(alpha: 0.98)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(style.icon, color: style.color, size: 32),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: kTextDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        color: kTextMuted,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+}
+
+_AppSnackBarStyle _snackBarStyle(AppSnackBarType type) {
+  switch (type) {
+    case AppSnackBarType.success:
+      return const _AppSnackBarStyle(
+        color: Color(0xFF12B76A),
+        softColor: Color(0xFFEAFBF1),
+        icon: Icons.check_circle_outline_rounded,
+      );
+    case AppSnackBarType.error:
+      return const _AppSnackBarStyle(
+        color: Color(0xFFFF3B00),
+        softColor: Color(0xFFFFF0EA),
+        icon: Icons.error_outline_rounded,
+      );
+    case AppSnackBarType.alert:
+      return const _AppSnackBarStyle(
+        color: Color(0xFFE66A12),
+        softColor: Color(0xFFFFF4E8),
+        icon: Icons.warning_amber_rounded,
+      );
+    case AppSnackBarType.info:
+      return const _AppSnackBarStyle(
+        color: Color(0xFF12A8E8),
+        softColor: Color(0xFFEAFBFF),
+        icon: Icons.info_outline_rounded,
+      );
+  }
+}
+
+class _AppSnackBarStyle {
+  final Color color;
+  final Color softColor;
+  final IconData icon;
+
+  const _AppSnackBarStyle({
+    required this.color,
+    required this.softColor,
+    required this.icon,
+  });
+}
+
 class GlassScaffold extends StatelessWidget {
   final Widget child;
   final String title;
@@ -175,6 +298,251 @@ class GlassTextField extends StatelessWidget {
   }
 }
 
+class SkeletonBox extends StatefulWidget {
+  final double? width;
+  final double? height;
+  final BorderRadius borderRadius;
+
+  const SkeletonBox({
+    super.key,
+    this.width,
+    this.height,
+    this.borderRadius = const BorderRadius.all(Radius.circular(12)),
+  });
+
+  @override
+  State<SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<SkeletonBox> {
+  bool _isShimmering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() => _isShimmering = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: _isShimmering ? -1 : 2, end: _isShimmering ? 2 : -1),
+      duration: const Duration(milliseconds: 1200),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius,
+            gradient: LinearGradient(
+              begin: Alignment(-1 + value, 0),
+              end: Alignment(value, 0),
+              colors: const [
+                Color(0xFFEDEDF0),
+                Color(0xFFF8F8FA),
+                Color(0xFFEDEDF0),
+              ],
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        if (mounted) {
+          setState(() => _isShimmering = !_isShimmering);
+        }
+      },
+    );
+  }
+}
+
+class ProductGridSkeleton extends StatelessWidget {
+  final int itemCount;
+
+  const ProductGridSkeleton({super.key, this.itemCount = 6});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => const _ProductCardSkeleton(),
+          childCount: itemCount,
+        ),
+      ),
+    );
+  }
+}
+
+class ListContentSkeleton extends StatelessWidget {
+  final int itemCount;
+  final EdgeInsets padding;
+
+  const ListContentSkeleton({
+    super.key,
+    this.itemCount = 5,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: padding,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: kCardBorder),
+        ),
+        child: const Row(
+          children: [
+            SkeletonBox(
+              width: 76,
+              height: 76,
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: double.infinity, height: 14),
+                  SizedBox(height: 10),
+                  SkeletonBox(width: 140, height: 12),
+                  SizedBox(height: 14),
+                  SkeletonBox(width: 86, height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddressSkeleton extends StatelessWidget {
+  const AddressSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kCardBorder),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(width: 150, height: 16),
+          SizedBox(height: 12),
+          SkeletonBox(width: double.infinity, height: 12),
+          SizedBox(height: 8),
+          SkeletonBox(width: 220, height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class ProductDetailSkeleton extends StatelessWidget {
+  const ProductDetailSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          SkeletonBox(
+            width: double.infinity,
+            height: 320,
+            borderRadius: BorderRadius.all(Radius.circular(24)),
+          ),
+          SizedBox(height: 24),
+          SkeletonBox(width: double.infinity, height: 22),
+          SizedBox(height: 12),
+          SkeletonBox(width: 130, height: 18),
+          SizedBox(height: 24),
+          SkeletonBox(width: double.infinity, height: 12),
+          SizedBox(height: 10),
+          SkeletonBox(width: double.infinity, height: 12),
+          SizedBox(height: 10),
+          SkeletonBox(width: 240, height: 12),
+          SizedBox(height: 28),
+          SkeletonBox(
+            width: double.infinity,
+            height: 54,
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductCardSkeleton extends StatelessWidget {
+  const _ProductCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kCardBorder),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SkeletonBox(
+                width: double.infinity,
+                borderRadius: BorderRadius.all(Radius.circular(14)),
+              ),
+            ),
+            SizedBox(height: 12),
+            SkeletonBox(width: double.infinity, height: 14),
+            SizedBox(height: 8),
+            SkeletonBox(width: 90, height: 12),
+            Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SkeletonBox(width: 64, height: 16),
+                SkeletonBox(
+                  width: 34,
+                  height: 34,
+                  borderRadius: BorderRadius.all(Radius.circular(17)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 Future<bool> showCancelOrderDialog(BuildContext context) async {
   final ok = await showDialog<bool>(
@@ -243,19 +611,18 @@ Future<bool> showCancelOrderDialog(BuildContext context) async {
 }
 
 /// Shows a cancel result snackbar.
-void showCancelSnackBar(BuildContext context, {required bool success, required String orderId}) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        success ? 'Order #$orderId cancelled' : 'Could not cancel order',
-      ),
-      backgroundColor: success ? kBrandRed : Colors.grey,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ),
+void showCancelSnackBar(
+  BuildContext context, {
+  required bool success,
+  required String orderId,
+}) {
+  showAppSnackBar(
+    context,
+    title: success ? 'Success' : 'Error',
+    message: success ? 'Order #$orderId cancelled' : 'Could not cancel order',
+    type: success ? AppSnackBarType.success : AppSnackBarType.error,
   );
 }
-
 
 // shared_ui.dart
 Future<bool> showRemoveCartItemDialog(BuildContext context) async {
@@ -278,7 +645,11 @@ Future<bool> showRemoveCartItemDialog(BuildContext context) async {
           const SizedBox(width: 12),
           const Text(
             'Remove Item',
-            style: TextStyle(fontWeight: FontWeight.w700, color: kTextDark, fontSize: 17),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: kTextDark,
+              fontSize: 17,
+            ),
           ),
         ],
       ),
@@ -289,7 +660,10 @@ Future<bool> showRemoveCartItemDialog(BuildContext context) async {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('No', style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w600)),
+          child: const Text(
+            'No',
+            style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w600),
+          ),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -297,10 +671,15 @@ Future<bool> showRemoveCartItemDialog(BuildContext context) async {
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Remove', style: TextStyle(fontWeight: FontWeight.w700)),
+          child: const Text(
+            'Remove',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     ),
@@ -322,7 +701,8 @@ class _LogoutDialog extends StatelessWidget {
   const _LogoutDialog();
 
   @override
-  Widget build(BuildContext context) {   // ← use this 'context' everywhere below
+  Widget build(BuildContext context) {
+    // ← use this 'context' everywhere below
     final theme = Theme.of(context);
 
     return Dialog(
@@ -362,7 +742,11 @@ class _LogoutDialog extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.logout_rounded, color: Colors.white, size: 28),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -386,7 +770,8 @@ class _LogoutDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(false), // ← context, not ctx
+                    onPressed: () =>
+                        Navigator.of(context).pop(false), // ← context, not ctx
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -424,7 +809,8 @@ class _LogoutDialog extends StatelessWidget {
                       ],
                     ),
                     child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true), // ← context, not ctx
+                      onPressed: () =>
+                          Navigator.of(context).pop(true), // ← context, not ctx
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         foregroundColor: Colors.white,
@@ -449,7 +835,6 @@ class _LogoutDialog extends StatelessWidget {
     );
   }
 }
-
 
 /// Shows a save profile confirmation dialog.
 /// Returns [true] if the user confirmed, [false] otherwise.
@@ -520,11 +905,7 @@ Future<bool?> showSaveProfileDialog(BuildContext context) {
             const Text(
               'Are you sure you want to save\nyour profile changes?',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: kTextMuted,
-                fontSize: 14,
-                height: 1.5,
-              ),
+              style: TextStyle(color: kTextMuted, fontSize: 14, height: 1.5),
             ),
 
             const SizedBox(height: 28),

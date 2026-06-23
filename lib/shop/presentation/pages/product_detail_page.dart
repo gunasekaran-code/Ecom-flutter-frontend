@@ -78,12 +78,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Added to cart!'),
-        backgroundColor: Color(0xFF1DB954),
-        behavior: SnackBarBehavior.floating,
-      ),
+    showAppSnackBar(
+      context,
+      title: 'Success',
+      message: 'Added to cart!',
+      type: AppSnackBarType.success,
     );
 
     Navigator.push(
@@ -151,7 +150,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: kBrandRed.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -315,9 +317,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return Scaffold(
         backgroundColor: kBackground,
         appBar: _buildAppBar(),
-        body: const Center(
-          child: CircularProgressIndicator(color: kBrandRed, strokeWidth: 2.5),
-        ),
+        body: const ProductDetailSkeleton(),
       );
     }
 
@@ -342,10 +342,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       backgroundColor: kBackground,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
-        child: Column(                          // ← outer Column
+        child: Column(
+          // ← outer Column
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── Image carousel ───────────────────────────────────────
             if (imageList.isNotEmpty)
               Column(
@@ -369,14 +369,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) =>
                                   Container(
-                                width: double.infinity,
-                                color: kSurface,
-                                child: const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 64,
-                                  color: kTextMuted,
-                                ),
-                              ),
+                                    width: double.infinity,
+                                    color: kSurface,
+                                    child: const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      size: 64,
+                                      color: kTextMuted,
+                                    ),
+                                  ),
                             ),
                           );
                         },
@@ -418,8 +418,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         itemBuilder: (context, index) {
                           final isSelected = currentImageIndex == index;
                           return Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 4.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0,
+                            ),
                             child: GestureDetector(
                               onTap: () => pageController.animateToPage(
                                 index,
@@ -476,7 +477,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
 
             // ── Product info ─────────────────────────────────────────
-            Padding(                            // ← Padding ends after its child
+            Padding(
+              // ← Padding ends after its child
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,7 +486,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   // Category chip
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: kBrandRed.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(6),
@@ -516,19 +520,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   // Rating
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded,
-                          color: Colors.amber, size: 20),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         product!.rating.toString(),
                         style: const TextStyle(
-                            color: kTextDark,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600),
+                          color: kTextDark,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('· Rating',
-                          style: TextStyle(color: kTextMuted, fontSize: 14)),
+                      const Text(
+                        '· Rating',
+                        style: TextStyle(color: kTextMuted, fontSize: 14),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -563,9 +573,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             ? 'In Stock (${product!.stock} units)'
                             : 'Out of Stock',
                         style: const TextStyle(
-                            color: kTextMuted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500),
+                          color: kTextMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -578,15 +589,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   const Text(
                     'Description',
                     style: TextStyle(
-                        color: kTextDark,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700),
+                      color: kTextDark,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     product!.description,
                     style: const TextStyle(
-                        color: kTextMuted, fontSize: 14.5, height: 1.6),
+                      color: kTextMuted,
+                      fontSize: 14.5,
+                      height: 1.6,
+                    ),
                   ),
                   const SizedBox(height: 32),
 
@@ -601,7 +616,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         disabledBackgroundColor: kBorder,
                         disabledForegroundColor: kTextMuted,
                       ),
@@ -609,24 +625,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       label: Text(
                         product!.isInStock
                             ? isAddingToCart
-                                ? 'Adding...'
-                                : 'Add to Cart'
+                                  ? 'Adding...'
+                                  : 'Add to Cart'
                             : 'Out of Stock',
                         style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
                 ],
               ),
-            ),                                 // ← Padding closes here
-
+            ), // ← Padding closes here
             // ── Related products (sibling in outer Column) ────────────
-            _buildRelatedProducts(),           // ← correct placement
-
+            _buildRelatedProducts(), // ← correct placement
           ],
         ),
       ),

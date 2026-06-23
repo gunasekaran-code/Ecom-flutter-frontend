@@ -66,24 +66,14 @@ class _WishlistPageState extends State<WishlistPage> {
       wishlistItems.removeWhere((item) => item['product_id'] == productId);
     });
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: kBrandRed,
-          content: const Text(
-            'Removed from wishlist',
-            style: TextStyle(color: Colors.white),
-          ),
-          duration: const Duration(seconds: 1),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Info',
+        message: 'Removed from wishlist',
+        type: AppSnackBarType.info,
+        duration: const Duration(seconds: 1),
       );
     }
-    // } catch (e) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(backgroundColor: kBrandRed, content: Text('Error: $e')),
-    //     );
-    //   }
-    // }
   }
 
   Future<void> _moveToCart(Map<String, dynamic> item) async {
@@ -129,15 +119,12 @@ class _WishlistPageState extends State<WishlistPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green, // Success is usually green, not red!
-            content: const Text(
-              'Moved to cart',
-              style: TextStyle(color: Colors.white),
-            ),
-            duration: const Duration(seconds: 1),
-          ),
+        showAppSnackBar(
+          context,
+          title: 'Success',
+          message: 'Moved to cart',
+          type: AppSnackBarType.success,
+          duration: const Duration(seconds: 1),
         );
         Navigator.push(
           context,
@@ -158,16 +145,12 @@ class _WishlistPageState extends State<WishlistPage> {
           errorMessage = errorMessage.replaceFirst('Error: ', '');
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: kBrandRed,
-            content: Text(
-              errorMessage,
-            ), // Now it will cleanly say "This product is currently out of stock."
-            duration: const Duration(
-              seconds: 2,
-            ), // Added a duration so it dismisses
-          ),
+        showAppSnackBar(
+          context,
+          title: 'Error',
+          message: errorMessage,
+          type: AppSnackBarType.error,
+          duration: const Duration(seconds: 2),
         );
       }
     }
@@ -219,7 +202,7 @@ class _WishlistPageState extends State<WishlistPage> {
         ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: kBrandRed))
+          ? const ListContentSkeleton(itemCount: 5)
           : wishlistItems.isEmpty
           ? _buildEmptyState(context)
           : RefreshIndicator(

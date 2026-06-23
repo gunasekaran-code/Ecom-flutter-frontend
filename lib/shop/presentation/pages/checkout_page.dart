@@ -156,8 +156,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Future<void> _placeOrder() async {
     if (_selectedAddressId == null && !_showAddressForm) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address')),
+      showAppSnackBar(
+        context,
+        title: 'Alert',
+        message: 'Please select a delivery address',
+        type: AppSnackBarType.alert,
       );
       return;
     }
@@ -208,8 +211,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Future<void> _saveNewAddress() async {
     if (!_formKey.currentState!.validate() || _selectedState == null) {
       if (_selectedState == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a state / province')),
+        showAppSnackBar(
+          context,
+          title: 'Alert',
+          message: 'Please select a state / province',
+          type: AppSnackBarType.alert,
         );
       }
       return;
@@ -235,11 +241,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _isSavingAddress = false;
       _showAddressForm = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Address saved successfully'),
-        backgroundColor: Color(0xFF1DB954),
-      ),
+    showAppSnackBar(
+      context,
+      title: 'Success',
+      message: 'Address saved successfully',
+      type: AppSnackBarType.success,
     );
     _clearForm();
   }
@@ -313,11 +319,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
         }
         _showAddressForm = _savedAddresses.isEmpty;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Address deleted'),
-          backgroundColor: Color(0xFF1DB954),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Success',
+        message: 'Address deleted',
+        type: AppSnackBarType.success,
       );
     }
   }
@@ -793,12 +799,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: _isLoadingAddresses
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: kBrandRed),
-                    ),
-                  )
+                ? const AddressSkeleton()
                 : Column(
                     children: [
                       if (_savedAddresses.isNotEmpty && !_showAddressForm)

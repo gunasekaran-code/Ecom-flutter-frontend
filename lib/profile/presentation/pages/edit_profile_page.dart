@@ -93,9 +93,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+        title: 'Error',
+        message: 'Failed to pick image: $e',
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -221,11 +224,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final phone = _phoneController.text.trim();
 
     if (fullName.isEmpty || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Name and email are required.'),
-          backgroundColor: Colors.orange,
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Alert',
+        message: 'Name and email are required.',
+        type: AppSnackBarType.alert,
       );
       return;
     }
@@ -249,18 +252,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     if (result['success'] == true) {
       final updatedData = result['data'] as Map<String, dynamic>;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-          backgroundColor: kBrandRed,
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Success',
+        message: 'Profile updated successfully',
+        type: AppSnackBarType.success,
       );
       Navigator.pop(context, updatedData);
     } else {
       final errorText =
           result['error']?.toString() ?? 'Failed to update profile';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorText), backgroundColor: Colors.redAccent),
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: errorText,
+        type: AppSnackBarType.error,
       );
     }
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:wss_sports/auth/pages/login_page.dart'
-    show LoginPage;
+import 'package:wss_sports/auth/pages/login_page.dart' show LoginPage;
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
@@ -52,12 +51,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
+    showAppSnackBar(
+      context,
+      title: color == Colors.red ? 'Error' : 'Alert',
+      message: message,
+      type: color == Colors.red ? AppSnackBarType.error : AppSnackBarType.alert,
     );
   }
 

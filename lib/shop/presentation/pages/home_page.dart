@@ -8,7 +8,6 @@ import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'dart:async';
 
-
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData;
   const HomePage({super.key, required this.userData});
@@ -470,11 +469,7 @@ class _HomePageState extends State<HomePage> {
 
                 // Products Grid
                 isLoading
-                    ? const SliverFillRemaining(
-                        child: Center(
-                          child: CircularProgressIndicator(color: kBrandRed),
-                        ),
-                      )
+                    ? const ProductGridSkeleton()
                     : filteredProducts.isEmpty
                     ? SliverFillRemaining(
                         child: Center(
@@ -634,11 +629,12 @@ class _ProductCardState extends State<ProductCard> {
       WishlistService().removeLocalProduct(widget.product.id);
       setState(() => _isInWishlist = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.strings.removedFromWishlist),
-            duration: const Duration(seconds: 1),
-          ),
+        showAppSnackBar(
+          context,
+          title: 'Info',
+          message: context.strings.removedFromWishlist,
+          type: AppSnackBarType.info,
+          duration: const Duration(seconds: 1),
         );
       }
 
@@ -648,11 +644,12 @@ class _ProductCardState extends State<ProductCard> {
     WishlistService().addLocalProduct(widget.product);
     setState(() => _isInWishlist = true);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.strings.addedToWishlist),
-          duration: const Duration(seconds: 1),
-        ),
+      showAppSnackBar(
+        context,
+        title: 'Success',
+        message: context.strings.addedToWishlist,
+        type: AppSnackBarType.success,
+        duration: const Duration(seconds: 1),
       );
     }
   }

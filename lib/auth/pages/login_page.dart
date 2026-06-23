@@ -11,8 +11,6 @@ import 'package:wss_sports/shared/widgets/navbar.dart';
 import 'package:wss_sports/utils/google_button_setup.dart';
 // import 'package:wss_sports/features/admin/presentation/pages/admin_dashboard_page.dart';
 
-
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
   @override
@@ -157,13 +155,33 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
+    showAppSnackBar(
+      context,
+      title: _snackBarTitle(color),
+      message: message,
+      type: _snackBarType(color),
     );
+  }
+
+  AppSnackBarType _snackBarType(Color color) {
+    if (color == Colors.red ||
+        color == Colors.redAccent ||
+        color == Colors.blueGrey) {
+      return AppSnackBarType.error;
+    }
+    if (color == Colors.orange) return AppSnackBarType.alert;
+    if (color == kBrandRed) return AppSnackBarType.success;
+    return AppSnackBarType.info;
+  }
+
+  String _snackBarTitle(Color color) {
+    final type = _snackBarType(color);
+    return switch (type) {
+      AppSnackBarType.success => 'Success',
+      AppSnackBarType.error => 'Error',
+      AppSnackBarType.alert => 'Alert',
+      AppSnackBarType.info => 'Info',
+    };
   }
 
   @override

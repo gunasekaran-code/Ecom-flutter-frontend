@@ -161,7 +161,63 @@ class _MyAppState extends State<MyApp> {
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-              theme: ThemeData(fontFamily: language.fontFamily),
+              theme: ThemeData(
+                // The default font for unassigned text styles
+                fontFamily: language.fontFamily,
+
+                // Explicitly defining fonts for different text categories
+                textTheme: TextTheme(
+                  // HEADINGS -> Plus Jakarta Sans
+                  displayLarge: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  displayMedium: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  displaySmall: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  headlineLarge: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  headlineMedium: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  headlineSmall: TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+
+                  // SUBTITLES / TITLES -> SF Pro
+                  titleLarge: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  titleMedium: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  titleSmall: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+
+                  // MONOSPACE / SMALL LABELS -> Andale Mono
+                  labelSmall: TextStyle(
+                    fontFamily: 'AndaleMono',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                  labelMedium: TextStyle(
+                    fontFamily: 'AndaleMono',
+                    fontFamilyFallback: language.fontFamilyFallback,
+                  ),
+                ),
+              ),
               builder: (context, child) {
                 return DefaultTextStyle.merge(
                   style: TextStyle(

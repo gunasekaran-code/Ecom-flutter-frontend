@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:wss_sports/auth/pages/login_page.dart'
-    show LoginPage;
+import 'package:wss_sports/auth/pages/login_page.dart' show LoginPage;
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
@@ -95,13 +94,31 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
+    showAppSnackBar(
+      context,
+      title: _snackBarTitle(color),
+      message: message,
+      type: _snackBarType(color),
     );
+  }
+
+  AppSnackBarType _snackBarType(Color color) {
+    if (color == Colors.red || color == Colors.redAccent) {
+      return AppSnackBarType.error;
+    }
+    if (color == Colors.orange) return AppSnackBarType.alert;
+    if (color == kBrandRed) return AppSnackBarType.success;
+    return AppSnackBarType.info;
+  }
+
+  String _snackBarTitle(Color color) {
+    final type = _snackBarType(color);
+    return switch (type) {
+      AppSnackBarType.success => 'Success',
+      AppSnackBarType.error => 'Error',
+      AppSnackBarType.alert => 'Alert',
+      AppSnackBarType.info => 'Info',
+    };
   }
 
   @override

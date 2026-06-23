@@ -252,14 +252,34 @@ class _RegisterPageState extends State<RegisterPage> {
     Color color, {
     Duration duration = const Duration(seconds: 3),
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        duration: duration,
-      ),
+    showAppSnackBar(
+      context,
+      title: _snackBarTitle(color),
+      message: message,
+      type: _snackBarType(color),
+      duration: duration,
     );
+  }
+
+  AppSnackBarType _snackBarType(Color color) {
+    if (color == Colors.red || color == Colors.redAccent) {
+      return AppSnackBarType.error;
+    }
+    if (color == Colors.orange) return AppSnackBarType.alert;
+    if (color == Colors.green || color == kBrandRed) {
+      return AppSnackBarType.success;
+    }
+    return AppSnackBarType.info;
+  }
+
+  String _snackBarTitle(Color color) {
+    final type = _snackBarType(color);
+    return switch (type) {
+      AppSnackBarType.success => 'Success',
+      AppSnackBarType.error => 'Error',
+      AppSnackBarType.alert => 'Alert',
+      AppSnackBarType.info => 'Info',
+    };
   }
 
   @override
