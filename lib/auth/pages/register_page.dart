@@ -142,7 +142,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     setState(() => isLoading = true);
-    print('🔵 Button pressed, calling API...');
+    debugPrint('Button pressed, calling API...');
 
     try {
       final result = await ApiService.registerUser(
@@ -151,10 +151,11 @@ class _RegisterPageState extends State<RegisterPage> {
             .trim()
             .toLowerCase(), // Convert to lowercase
         password: passwordController.text.trim(),
+        passwordConfirmation: confirmPasswordController.text.trim(),
       );
 
       setState(() => isLoading = false);
-      print('🔵 API Result: $result');
+      debugPrint('API Result: $result');
 
       if (result['success']) {
         _showSnackBar(strings.registrationSuccess, Colors.green);
@@ -238,7 +239,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       setState(() => isLoading = false);
-      print('🔴 Exception in handleRegister: $e');
+      debugPrint('Exception in handleRegister: $e');
       _showSnackBar(
         strings.networkError,
         Colors.red,

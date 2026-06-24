@@ -23,15 +23,9 @@ class _LoginPageState extends State<LoginPage> {
   final GoogleAuthService _googleAuthService = GoogleAuthService();
   bool isLoading = false;
 
-  static const String _demoEmail = 'guna@gmail.com';
-  static const String _demoPassword = '123456';
-  static const String _demoName = 'Guna Sekaran V';
-
   @override
   void initState() {
     super.initState();
-    // emailController.text = _demoEmail;
-    // passwordController.text = _demoPassword;
     if (kIsWeb) _renderGoogleButton();
   }
 
@@ -49,20 +43,6 @@ class _LoginPageState extends State<LoginPage> {
     final strings = context.strings;
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
-    if (email == _demoEmail && password == _demoPassword) {
-      setState(() => isLoading = false);
-      _showSnackBar(strings.welcomeBackToast, kBrandRed);
-      final userData = {'id': 1, 'name': _demoName, 'email': _demoEmail};
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => UserHomePage(userData: userData),
-        ),
-      );
-      return;
-    }
 
     if (email.isEmpty || password.isEmpty) {
       _showSnackBar(strings.pleaseEnterEmailPassword, Colors.orange);
@@ -245,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: TextButton(
                   onPressed: isLoading
                       ? null
-                      : () => Navigator.push(
+                      : () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
                             builder: (context) => const ForgotPasswordPage(),
