@@ -210,7 +210,8 @@ const Map<String, Map<String, String>> _localizedValues = {
     'loginFailed': 'Login failed',
     'serverDatabaseError': 'Server database error. Please check backend logs.',
     'emailNotRegistered': 'Email not registered.',
-    'incorrectPassword': 'Incorrect password.',
+    'incorrectPassword': 'Incorrect Email or password',
+    
     'connectionFailed': 'Connection failed. Is the server running?',
     'googleSignInSuccess': 'Google Sign-In successful!',
     'googleSignInCancelled': 'Google Sign-In cancelled.',

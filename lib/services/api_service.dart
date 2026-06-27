@@ -120,6 +120,7 @@ class ApiService {
               data,
               'Login failed. Status: ${response.statusCode}',
             ),
+            'errors': data['errors'],
           };
         }
       } catch (jsonError) {

@@ -11,12 +11,15 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController =
       TextEditingController();
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
 
   bool isLoading = false;
   String? nameError;
@@ -129,6 +132,8 @@ class _RegisterPageState extends State<RegisterPage> {
         passwordError = passwordValidation;
         confirmPasswordError = confirmPasswordValidation;
       });
+
+      _triggerShake();
 
       // Show first error in snackbar
       String errorMsg =
@@ -284,6 +289,20 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn),
+    );
+  }
+
+  void _triggerShake() => _shakeController.forward(from: 0);
+
+  @override
   Widget build(BuildContext context) {
     final strings = context.strings;
 
@@ -326,99 +345,112 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 32),
 
-              // Name Field with Error
-              GlassTextField(
-                hintText: strings.usernameHint,
-                icon: Icons.person_outline,
-                controller: nameController,
-              ),
-              if (nameError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      nameError!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+              AnimatedBuilder(
+                animation: _shakeAnimation,
+                builder: (context, child) {
+                  final offset = _shakeAnimation.value == 0
+                      ? 0.0
+                      : 8 * (0.5 - (_shakeAnimation.value % 0.1) / 0.1).abs();
+                  return Transform.translate(
+                    offset: Offset(offset, 0),
+                    child: child,
+                  );
+                },
+                child: Column(
+                  children: [
+                    GlassTextField(
+                      hintText: strings.usernameHint,
+                      icon: Icons.person_outline,
+                      controller: nameController,
                     ),
-                  ),
-                ),
-              const SizedBox(height: 16),
+                    if (nameError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            nameError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
 
-              // Email Field with Error
-              GlassTextField(
-                hintText: strings.emailHint,
-                icon: Icons.email_outlined,
-                controller: emailController,
-              ),
-              if (emailError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      emailError!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    GlassTextField(
+                      hintText: strings.emailHint,
+                      icon: Icons.email_outlined,
+                      controller: emailController,
                     ),
-                  ),
-                ),
-              const SizedBox(height: 16),
+                    if (emailError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            emailError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
 
-              // Password Field with Error
-              GlassTextField(
-                hintText: strings.passwordHint,
-                icon: Icons.lock_outline,
-                isPassword: true,
-                controller: passwordController,
-              ),
-              if (passwordError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      passwordError!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    GlassTextField(
+                      hintText: strings.passwordHint,
+                      icon: Icons.lock_outline,
+                      isPassword: true,
+                      controller: passwordController,
                     ),
-                  ),
-                ),
-              const SizedBox(height: 16),
+                    if (passwordError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            passwordError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
 
-              // Confirm Password Field with Error
-              GlassTextField(
-                hintText: strings.confirmPasswordHint,
-                icon: Icons.lock_outline,
-                isPassword: true,
-                controller: confirmPasswordController,
-              ),
-              if (confirmPasswordError != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      confirmPasswordError!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    GlassTextField(
+                      hintText: strings.confirmPasswordHint,
+                      icon: Icons.lock_outline,
+                      isPassword: true,
+                      controller: confirmPasswordController,
                     ),
-                  ),
+                    if (confirmPasswordError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            confirmPasswordError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              const SizedBox(height: 28),
+              ),
+
+              const SizedBox(height: 28),  
 
               // Register Button
               SizedBox(

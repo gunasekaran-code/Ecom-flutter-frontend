@@ -109,9 +109,35 @@ class _LoginPageState extends State<LoginPage>
           return;
         }
 
+        final errors = result['errors'];
+        if (errors is Map) {
+          final passwordErrors = errors['password'];
+          final emailErrors = errors['email'];
+
+          if (passwordErrors != null) {
+            final msg = (passwordErrors is List)
+                ? passwordErrors.first.toString()
+                : passwordErrors.toString();
+            _showSnackBar(msg, Colors.redAccent);
+            _triggerShake();
+            return;
+          }
+
+          if (emailErrors != null) {
+            final msg = (emailErrors is List)
+                ? emailErrors.first.toString()
+                : emailErrors.toString();
+            _showSnackBar(msg, Colors.blueGrey);
+            _triggerShake();
+            return;
+          }
+        }
+
+        // Fallback checks
         if (serverError.contains('email') ||
             serverError.contains('not found')) {
           _showSnackBar(strings.emailNotRegistered, Colors.blueGrey);
+          _triggerShake();
         } else if (serverError.contains('password') ||
             serverError.contains('credentials')) {
           _showSnackBar(strings.incorrectPassword, Colors.redAccent);
