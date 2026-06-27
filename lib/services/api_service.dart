@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.14:8000/api';
+  static const String baseUrl = 'http://192.168.1.10:8000/api';
 
   static const bool debugMode = true;
   static const Duration _requestTimeout = Duration(seconds: 30);

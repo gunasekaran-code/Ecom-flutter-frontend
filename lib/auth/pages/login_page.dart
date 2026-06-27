@@ -17,16 +17,39 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final GoogleAuthService _googleAuthService = GoogleAuthService();
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    // Shake animation setup
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn),
+    );
+
     if (kIsWeb) _renderGoogleButton();
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  void _triggerShake() {
+    _shakeController.forward(from: 0);
   }
 
   void _renderGoogleButton() {
@@ -46,6 +69,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (email.isEmpty || password.isEmpty) {
       _showSnackBar(strings.pleaseEnterEmailPassword, Colors.orange);
+      _triggerShake();
       return;
     }
 
@@ -91,8 +115,10 @@ class _LoginPageState extends State<LoginPage> {
         } else if (serverError.contains('password') ||
             serverError.contains('credentials')) {
           _showSnackBar(strings.incorrectPassword, Colors.redAccent);
+          _triggerShake();
         } else {
           _showSnackBar(errorText, Colors.red);
+          _triggerShake();
         }
       }
     } catch (e) {
@@ -207,17 +233,33 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 32),
 
-              GlassTextField(
-                hintText: strings.email,
-                icon: Icons.email_outlined,
-                controller: emailController,
-              ),
-              const SizedBox(height: 16),
-              GlassTextField(
-                hintText: strings.password,
-                icon: Icons.lock_outline,
-                isPassword: true,
-                controller: passwordController,
+              AnimatedBuilder(
+                animation: _shakeAnimation,
+                builder: (context, child) {
+                  final offset = _shakeAnimation.value == 0
+                      ? 0.0
+                      : 8 * (0.5 - (_shakeAnimation.value % 0.1) / 0.1).abs();
+                  return Transform.translate(
+                    offset: Offset(offset, 0),
+                    child: child,
+                  );
+                },
+                child: Column(
+                  children: [
+                    GlassTextField(
+                      hintText: strings.email,
+                      icon: Icons.email_outlined,
+                      controller: emailController,
+                    ),
+                    const SizedBox(height: 16),
+                    GlassTextField(
+                      hintText: strings.password,
+                      icon: Icons.lock_outline,
+                      isPassword: true,
+                      controller: passwordController,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
               Align(
