@@ -9,24 +9,18 @@ class ApiService {
   static const bool debugMode = true;
   static const Duration _requestTimeout = Duration(seconds: 30);
 
-  //   // Helper method to log debug info
   static void _log(String message) {
-    if (debugMode) {
-      print('🔵 [API] $message');
-    }
+    if (debugMode) print('🔵 [API] $message');
   }
 
-  //   // Helper method to log errors
   static void _logError(String message) {
-    if (debugMode) {
-      print('🔴 [API ERROR] $message');
-    }
+    if (debugMode) print('🔴 [API ERROR] $message');
   }
 
   static Map<String, String> get _jsonHeaders => const {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
 
   static dynamic _decodeBody(http.Response response) {
     if (response.body.isEmpty) return <String, dynamic>{};
@@ -34,10 +28,6 @@ class ApiService {
   }
 
   static String _errorMessage(dynamic data, String fallback) {
-    if (data is Map<String, dynamic>) {
-      return (data['error'] ?? data['detail'] ?? data['message'] ?? fallback)
-          .toString();
-    }
     if (data is Map) {
       return (data['error'] ?? data['detail'] ?? data['message'] ?? fallback)
           .toString();
@@ -50,11 +40,8 @@ class ApiService {
       statusCode >= 200 && statusCode < 300;
 
   static Future<http.Response> _postJson(
-    String path,
-    Map<String, dynamic> body,
-  ) {
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
-    final uri = Uri.parse('$baseUrl$normalizedPath');
+      String path, Map<String, dynamic> body) {
+    final uri = Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
     _log('POST $uri');
     _log('Request body: ${jsonEncode(body)}');
     return http
@@ -62,14 +49,26 @@ class ApiService {
         .timeout(_requestTimeout);
   }
 
-  // Ping server to wake it up (useful for Render free tier)
+  static Future<http.Response> _getJson(String path,
+      {Map<String, String>? queryParams}) {
+    final uri = Uri.parse(
+            '$baseUrl${path.startsWith('/') ? path : '/$path'}')
+        .replace(queryParameters: queryParams);
+    _log('GET $uri');
+    return http.get(uri, headers: _jsonHeaders).timeout(_requestTimeout);
+  }
+
+  // ─────────────────────────────────────────────
+  //  SERVER HEALTH
+  // ─────────────────────────────────────────────
+
   static Future<bool> pingServer() async {
     try {
-      _log('Pinging server to wake it up...');
+      _log('Pinging server...');
       final response = await http
           .get(Uri.parse('$baseUrl/products/'))
           .timeout(const Duration(seconds: 30));
-      _log('Ping response: ${response.statusCode}');
+      _log('Ping: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
       _logError('Ping failed: $e');
@@ -77,111 +76,95 @@ class ApiService {
     }
   }
 
-  //   // ============= USER APIs =============
+  // ─────────────────────────────────────────────
+  //  USER APIs
+  // ─────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> loginUser({
     required String email,
     required String password,
   }) async {
     try {
-      _log('Attempting login to: $baseUrl/login/');
-      _log('Email: $email');
+      _log('Login: $email');
+      final response =
+          await _postJson('/login/', {'email': email, 'password': password});
+      _log('Status: ${response.statusCode}');
 
-      final response = await _postJson('/login/', {
-        'email': email,
-        'password': password,
-      });
-
-      _log('Response status: ${response.statusCode}');
-      _log('Response headers: ${response.headers}');
-      _log('Response body: ${response.body}');
-
-      // Handle empty response body
       if (response.body.isEmpty) {
-        _logError('Empty response body received');
         return {
           'success': false,
-          'error':
-              'Server returned empty response. Status: ${response.statusCode}',
+          'error': 'Empty response. Status: ${response.statusCode}',
         };
       }
 
-      try {
-        final data = _decodeBody(response);
-
-        if (_isSuccessStatus(response.statusCode)) {
-          _log('Login successful');
-          return {'success': true, 'data': data};
-        } else {
-          _logError('Login failed with status: ${response.statusCode}');
-          return {
-            'success': false,
-            'error': _errorMessage(
-              data,
-              'Login failed. Status: ${response.statusCode}',
-            ),
-            'errors': data['errors'],
-          };
-        }
-      } catch (jsonError) {
-        _logError('JSON parsing error: $jsonError');
-        _logError('Raw response: ${response.body}');
-        return {
-          'success': false,
-          'error':
-              'Server error. Status: ${response.statusCode}\n${response.body}',
-        };
+      final data = _decodeBody(response);
+      if (_isSuccessStatus(response.statusCode)) {
+        return {'success': true, 'data': data};
       }
-    } on TimeoutException catch (e) {
-      _logError('Request timeout: $e');
       return {
         'success': false,
-        'error':
-            'Request timed out. The server might be starting up. Please try again.',
+        'error': _errorMessage(data, 'Login failed. Status: ${response.statusCode}'),
+        'errors': data['errors'],
       };
+    } on TimeoutException {
+      return {'success': false, 'error': 'Request timed out. Please try again.'};
     } catch (e) {
-      _logError('Network error: $e');
-      return {
-        'success': false,
-        'error': 'Network error: $e\nPlease check your connection.',
-      };
+      return {'success': false, 'error': 'Network error: $e'};
     }
   }
 
-  //   // Login with automatic server wake-up
   static Future<Map<String, dynamic>> loginUserWithWakeUp({
     required String email,
     required String password,
   }) async {
-    _log('Attempting to wake up server before login...');
     await pingServer();
-    await Future.delayed(Duration(seconds: 2)); // Give server time to start
+    await Future.delayed(const Duration(seconds: 2));
     return loginUser(email: email, password: password);
   }
 
-  static Future<Map<String, dynamic>> forgotPassword({
+  static Future<Map<String, dynamic>> registerUser({
+    required String fullName,
     required String email,
+    required String password,
+    required String passwordConfirmation,
   }) async {
     try {
-      _log('Requesting password reset for: $email');
-
-      final response = await _postJson('/forgot-password/', {'email': email});
-
-      _log('Forgot password status: ${response.statusCode}');
-      _log('Forgot password body: ${response.body}');
-
+      final response = await _postJson('/register/', {
+        'name': fullName,
+        'email': email,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      });
+      if (response.body.isEmpty) {
+        return {'success': false, 'error': 'Empty response from server'};
+      }
       final data = _decodeBody(response);
-
       if (_isSuccessStatus(response.statusCode)) {
         return {'success': true, 'data': data};
       }
+      return {'success': false, 'error': data};
+    } on TimeoutException {
+      return {'success': false, 'error': 'Request timed out.'};
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
+  static Future<Map<String, dynamic>> forgotPassword(
+      {required String email}) async {
+    try {
+      final response =
+          await _postJson('/forgot-password/', {'email': email});
+      final data = _decodeBody(response);
+      if (_isSuccessStatus(response.statusCode)) {
+        return {'success': true, 'data': data};
+      }
       return {
         'success': false,
         'error': _errorMessage(data, 'Unable to send reset request.'),
       };
-    } on TimeoutException catch (e) {
-      return {'success': false, 'error': 'Request timeout: $e'};
+    } on TimeoutException {
+      return {'success': false, 'error': 'Request timed out.'};
     } catch (e) {
       return {'success': false, 'error': 'Network error: $e'};
     }
@@ -200,58 +183,32 @@ class ApiService {
         'password': password,
         'password_confirmation': passwordConfirmation,
       });
-
-      _log('Reset password status: ${response.statusCode}');
-      _log('Reset password body: ${response.body}');
-
       final data = _decodeBody(response);
-
       if (_isSuccessStatus(response.statusCode)) {
         return {'success': true, 'data': data};
       }
-
-      return {'success': false, 'error': _errorMessage(data, 'Reset failed')};
-    } on TimeoutException catch (e) {
-      return {'success': false, 'error': 'Request timeout: $e'};
+      return {'success': false, 'error': _errorMessage(data, 'Reset failed.')};
+    } on TimeoutException {
+      return {'success': false, 'error': 'Request timed out.'};
     } catch (e) {
       return {'success': false, 'error': 'Network error: $e'};
     }
   }
 
-  static Future<Map<String, dynamic>> registerUser({
-    required String fullName,
-    required String email,
-    required String password,
-    required String passwordConfirmation,
-  }) async {
+  static Future<Map<String, dynamic>?> getUser({required int id}) async {
     try {
-      _log('Attempting registration to: $baseUrl/register/');
-
-      final response = await _postJson('/register/', {
-        'name': fullName,
-        'email': email,
-        'password': password,
-        'password_confirmation': passwordConfirmation,
-      });
-
-      _log('Response status: ${response.statusCode}');
-      _log('Response body: ${response.body}');
-
-      if (response.body.isEmpty) {
-        return {'success': false, 'error': 'Empty response from server'};
+      _log('Fetching user ID: $id');
+      final response =
+          await http.get(Uri.parse('$baseUrl/users/$id/')).timeout(_requestTimeout);
+      _log('Get user: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data is Map<String, dynamic> ? data : null;
       }
-
-      final data = _decodeBody(response);
-
-      if (_isSuccessStatus(response.statusCode)) {
-        return {'success': true, 'data': data};
-      } else {
-        return {'success': false, 'error': data};
-      }
-    } on TimeoutException catch (e) {
-      return {'success': false, 'error': 'Request timeout: $e'};
+      return null;
     } catch (e) {
-      return {'success': false, 'error': 'Network error: $e'};
+      _logError('Error fetching user: $e');
+      return null;
     }
   }
 
@@ -264,39 +221,21 @@ class ApiService {
   }) async {
     try {
       _log('Updating user ID: $id');
-
-      final uri = Uri.parse('$baseUrl/users/partial/$id/');
-      final request = http.MultipartRequest('PATCH', uri);
-
-      if (fullName != null) {
-        request.fields['full_name'] = fullName;
-      }
-      if (email != null) {
-        request.fields['email'] = email;
-      }
-      if (phone != null) {
-        request.fields['phone'] = phone;
-      }
+      final request = http.MultipartRequest(
+          'PATCH', Uri.parse('$baseUrl/users/partial/$id/'));
+      if (fullName != null) request.fields['full_name'] = fullName;
+      if (email != null) request.fields['email'] = email;
+      if (phone != null) request.fields['phone'] = phone;
       if (imageFile != null) {
         final bytes = await imageFile.readAsBytes();
         request.files.add(
-          http.MultipartFile.fromBytes(
-            'image',
-            bytes,
-            filename: imageFile.name,
-          ),
-        );
+            http.MultipartFile.fromBytes('image', bytes, filename: imageFile.name));
       }
-
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
-
-      _log('Update user response: ${response.statusCode}');
-      _log('Response data: $responseData');
-
+      _log('Update user: ${response.statusCode}');
       if (response.statusCode == 200) {
-        final data = jsonDecode(responseData);
-        return {'success': true, 'data': data};
+        return {'success': true, 'data': jsonDecode(responseData)};
       }
       return {
         'success': false,
@@ -308,614 +247,1414 @@ class ApiService {
     }
   }
 
-  //   // ============= PRODUCT APIs =============
+  // ─────────────────────────────────────────────
+  //  PRODUCT APIs
+  // ─────────────────────────────────────────────
 
-  //   static Future<List<Product>> getProducts({String? category}) async {
-  //     try {
-  //       final uri = Uri.parse('$baseUrl/products/').replace(
-  //         queryParameters: category != null && category.isNotEmpty
-  //             ? {'category': category}
-  //             : null,
-  //       );
-
-  //       _log('Fetching products from: $uri');
-  //       final response = await http.get(uri);
-
-  //       _log('Products response status: ${response.statusCode}');
-
-  //       if (response.statusCode == 200) {
-  //         List<dynamic> data = jsonDecode(response.body);
-  //         _log('Retrieved ${data.length} products');
-  //         return data.map((json) => Product.fromJson(json)).toList();
-  //       } else {
-  //         _logError('Failed to fetch products: ${response.statusCode}');
-  //         _logError('Products response body: ${response.body}');
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching products: $e');
-  //     }
-  //     return [];
-  //   }
-
-  //   static Future<List<Product>> getAllProductsAdmin() async {
-  //     try {
-  //       _log('Fetching all admin products');
-  //       final response = await http.get(Uri.parse('$baseUrl/admin/products/'));
-
-  //       _log('Admin products response: ${response.statusCode}');
-  //       if (response.statusCode == 200) {
-  //         List<dynamic> data = jsonDecode(response.body);
-  //         return data.map((json) => Product.fromJson(json)).toList();
-  //       } else {
-  //         _logError('Admin products response body: ${response.body}');
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching admin products: $e');
-  //     }
-  //     return [];
-  //   }
-
-  static Future<Map<String, dynamic>?> getUser({required int id}) async {
+  /// Fetch all products, optionally filtered by [category].
+  static Future<List<Map<String, dynamic>>> getProducts(
+      {String? category}) async {
     try {
-      _log('Fetching user profile for ID: $id');
-      final response = await http.get(Uri.parse('$baseUrl/users/$id/'));
-      _log('Get user response: ${response.statusCode}');
-      _log('Get user body: ${response.body}');
-
+      final response = await _getJson(
+        '/products/',
+        queryParams: (category != null && category.isNotEmpty)
+            ? {'category': category}
+            : null,
+      );
+      _log('Products: ${response.statusCode}');
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data is Map<String, dynamic> ? data : null;
+        final data = jsonDecode(response.body) as List<dynamic>;
+        _log('Retrieved ${data.length} products');
+        return data.cast<Map<String, dynamic>>();
       }
+      _logError('Failed to fetch products: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      _logError('Error fetching products: $e');
+      return [];
+    }
+  }
+
+  /// Fetch a single product by [id].
+  static Future<Map<String, dynamic>?> getProductDetail(int id) async {
+    try {
+      _log('Fetching product detail ID: $id');
+      final response = await _getJson('/products/$id/');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      _logError('Product detail failed: ${response.statusCode}');
       return null;
     } catch (e) {
-      _logError('Error fetching user profile: $e');
+      _logError('Error fetching product detail: $e');
       return null;
     }
   }
 
-  //   static Future<Product?> getProductDetail(int id) async {
-  //     try {
-  //       _log('Fetching product detail for ID: $id');
-  //       final response = await http.get(Uri.parse('$baseUrl/products/$id/'));
+  /// Admin — fetch all products including soft-deleted ones.
+  static Future<List<Map<String, dynamic>>> getAllProductsAdmin() async {
+    try {
+      _log('Fetching all admin products');
+      final response = await _getJson('/admin/products/');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        return data.cast<Map<String, dynamic>>();
+      }
+      _logError('Admin products failed: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      _logError('Error fetching admin products: $e');
+      return [];
+    }
+  }
 
-  //       if (response.statusCode == 200) {
-  //         return Product.fromJson(jsonDecode(response.body));
-  //       } else {
-  //         _logError('Failed to fetch product detail: ${response.statusCode}');
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching product detail: $e');
-  //     }
-  //     return null;
-  //   }
+  /// Admin — create a new product.
+  static Future<Map<String, dynamic>> createProduct({
+    required String name,
+    required String description,
+    required double price,
+    required int categoryId,
+    required int stock,
+    double rating = 0.0,
+    int? skuId,
+    XFile? imageFile,
+  }) async {
+    try {
+      _log('Creating product: $name');
+      final request = http.MultipartRequest(
+          'POST', Uri.parse('$baseUrl/admin/products/create/'));
+      request.fields['name'] = name;
+      request.fields['description'] = description;
+      request.fields['price'] = price.toString();
+      request.fields['category'] = categoryId.toString();
+      request.fields['stock'] = stock.toString();
+      request.fields['rating'] = rating.toString();
+      if (skuId != null) request.fields['sku_id'] = skuId.toString();
+      if (imageFile != null) {
+        final bytes = await imageFile.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('image', bytes,
+            filename: imageFile.name));
+      }
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      _log('Create product: ${response.statusCode}');
+      if (response.statusCode == 201) {
+        return {'success': true, 'data': jsonDecode(responseData)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: $responseData',
+      };
+    } catch (e) {
+      _logError('Error creating product: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
-  //   static Future<bool> softDeleteProduct(int id) async {
-  //     try {
-  //       final response = await http.delete(
-  //         Uri.parse('$baseUrl/admin/products/soft-delete/$id/'),
-  //       );
-  //       return response.statusCode == 200;
-  //     } catch (e) {
-  //       _logError('Error soft deleting product: $e');
-  //       return false;
-  //     }
-  //   }
+  /// Admin — update an existing product.
+  static Future<Map<String, dynamic>> updateProduct({
+    required int id,
+    required String name,
+    required String description,
+    required double price,
+    required int categoryId,
+    required int stock,
+    double rating = 0.0,
+    int? skuId,
+    bool removeImage = false,
+    XFile? imageFile,
+  }) async {
+    try {
+      _log('Updating product ID: $id');
+      final request = http.MultipartRequest(
+          'PUT', Uri.parse('$baseUrl/admin/products/update/$id/'));
+      request.fields['name'] = name;
+      request.fields['description'] = description;
+      request.fields['price'] = price.toString();
+      request.fields['category'] = categoryId.toString();
+      request.fields['stock'] = stock.toString();
+      request.fields['rating'] = rating.toString();
+      if (skuId != null) request.fields['sku_id'] = skuId.toString();
+      if (removeImage) request.fields['remove_image'] = 'true';
+      if (imageFile != null) {
+        final bytes = await imageFile.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('image', bytes,
+            filename: imageFile.name));
+      }
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      _log('Update product: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(responseData)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: $responseData',
+      };
+    } catch (e) {
+      _logError('Error updating product: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
-  //   static Future<bool> restoreProduct(int id) async {
-  //     try {
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/admin/products/restore/$id/'),
-  //       );
-  //       return response.statusCode == 200;
-  //     } catch (e) {
-  //       _logError('Error restoring product: $e');
-  //       return false;
-  //     }
-  //   }
+  /// Admin — soft-delete a product.
+  static Future<bool> softDeleteProduct(int id) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/admin/products/soft-delete/$id/'))
+          .timeout(_requestTimeout);
+      return response.statusCode == 200;
+    } catch (e) {
+      _logError('Error soft deleting product: $e');
+      return false;
+    }
+  }
 
-  //   static Future<Map<String, dynamic>> createProduct({
-  //     required String name,
-  //     required String description,
-  //     required double price,
-  //     required int categoryId,
-  //     XFile? imageFile,
-  //     required int stock,
-  //     double rating = 0.0,
-  //     int? skuId,
-  //   }) async {
-  //     try {
-  //       _log('Creating product: $name');
+  /// Admin — restore a soft-deleted product.
+  static Future<bool> restoreProduct(int id) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/admin/products/restore/$id/'))
+          .timeout(_requestTimeout);
+      return response.statusCode == 200;
+    } catch (e) {
+      _logError('Error restoring product: $e');
+      return false;
+    }
+  }
 
-  //       var request = http.MultipartRequest(
-  //         'POST',
-  //         Uri.parse('$baseUrl/admin/products/create/'),
-  //       );
+  // ─────────────────────────────────────────────
+  //  CART APIs
+  // ─────────────────────────────────────────────
 
-  //       // Add text fields
-  //       request.fields['name'] = name;
-  //       request.fields['description'] = description;
-  //       request.fields['price'] = price.toString();
-  //       request.fields['category'] = categoryId.toString();
-  //       request.fields['stock'] = stock.toString();
-  //       request.fields['rating'] = rating.toString();
-  //       if (skuId != null) {
-  //         request.fields['sku_id'] = skuId.toString();
-  //       }
+  static Future<bool> addToCart({
+    required int userId,
+    required int productId,
+    int quantity = 1,
+  }) async {
+    try {
+      final response = await _postJson('/cart/add/', {
+        'user_id': userId,
+        'product_id': productId,
+        'quantity': quantity,
+      });
+      return _isSuccessStatus(response.statusCode);
+    } catch (e) {
+      _logError('Error adding to cart: $e');
+      return false;
+    }
+  }
 
-  //       // Add image file if selected
-  //       if (imageFile != null) {
-  //         final bytes = await imageFile.readAsBytes();
-  //         request.files.add(
-  //           http.MultipartFile.fromBytes(
-  //             'image',
-  //             bytes,
-  //             filename: imageFile.name,
-  //           ),
-  //         );
-  //         _log('Image attached: ${imageFile.name}');
-  //       }
+  static Future<List<dynamic>> getCart(int userId) async {
+    try {
+      final response = await _getJson('/cart/$userId/');
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (e) {
+      _logError('Error fetching cart: $e');
+    }
+    return [];
+  }
 
-  //       final response = await request.send();
-  //       final responseData = await response.stream.bytesToString();
+  static Future<bool> updateCartItem({
+    required int userId,
+    required int productId,
+    required int quantity,
+  }) async {
+    try {
+      final response = await _postJson('/cart/update/', {
+        'user_id': userId,
+        'product_id': productId,
+        'quantity': quantity,
+      });
+      return _isSuccessStatus(response.statusCode);
+    } catch (e) {
+      _logError('Error updating cart item: $e');
+      return false;
+    }
+  }
 
-  //       _log('Create product response: ${response.statusCode}');
-  //       _log('Response data: $responseData');
+  static Future<bool> removeFromCart({
+    required int userId,
+    required int productId,
+  }) async {
+    try {
+      final response = await _postJson(
+          '/cart/remove/', {'user_id': userId, 'product_id': productId});
+      return _isSuccessStatus(response.statusCode);
+    } catch (e) {
+      _logError('Error removing from cart: $e');
+      return false;
+    }
+  }
 
-  //       if (response.statusCode == 201) {
-  //         try {
-  //           final data = jsonDecode(responseData);
-  //           return {'success': true, 'data': data};
-  //         } catch (e) {
-  //           return {'success': true, 'data': responseData};
-  //         }
-  //       } else {
-  //         return {
-  //           'success': false,
-  //           'error': 'HTTP ${response.statusCode}: $responseData',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Error creating product: $e');
-  //       return {'success': false, 'error': 'Network error: $e'};
-  //     }
-  //   }
+  static Future<int> getCartCount(int userId) async {
+    final cart = await getCart(userId);
+    return cart.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
+  }
 
-  //   static Future<Map<String, dynamic>> updateProduct({
-  //     required int id,
-  //     required String name,
-  //     required String description,
-  //     required double price,
-  //     required int categoryId,
-  //     XFile? imageFile,
-  //     required int stock,
-  //     double rating = 0.0,
-  //     int? skuId,
-  //     bool removeImage = false,
-  //   }) async {
-  //     try {
-  //       _log('Updating product ID: $id');
+  static Future<Map<String, dynamic>> checkoutCart({
+    required int userId,
+    required List<int> productIds,
+    int? addressId,
+    Map<String, dynamic>? shippingAddress,
+    required String paymentMethod,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'user_id': userId,
+        'product_ids': productIds,
+        'payment_method': paymentMethod,
+      };
+      if (addressId != null) {
+        body['address_id'] = addressId;
+      } else if (shippingAddress != null) {
+        body['shipping_address'] = shippingAddress;
+      }
+      _log('Checkout body: ${jsonEncode(body)}');
+      final response = await _postJson('/cart/checkout/', body);
+      final data = jsonDecode(response.body);
+      if (_isSuccessStatus(response.statusCode)) {
+        return {'success': true, 'data': data};
+      }
+      return {
+        'success': false,
+        'error': data['error'] ?? 'Checkout failed.',
+      };
+    } catch (e) {
+      _logError('Checkout exception: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 
-  //       var request = http.MultipartRequest(
-  //         'PUT',
-  //         Uri.parse('$baseUrl/admin/products/update/$id/'),
-  //       );
+  // ─────────────────────────────────────────────
+  //  WISHLIST APIs
+  // ─────────────────────────────────────────────
 
-  //       // Add text fields
-  //       request.fields['name'] = name;
-  //       request.fields['description'] = description;
-  //       request.fields['price'] = price.toString();
-  //       request.fields['category'] = categoryId.toString();
-  //       request.fields['stock'] = stock.toString();
-  //       request.fields['rating'] = rating.toString();
-  //       if (skuId != null) {
-  //         request.fields['sku_id'] = skuId.toString();
-  //       }
-  //       if (removeImage) {
-  //         request.fields['remove_image'] = 'true';
-  //       }
+  static Future<List<dynamic>> getWishlist(int userId) async {
+    try {
+      final response = await _getJson('/wishlist/$userId/');
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (e) {
+      _logError('Error fetching wishlist: $e');
+    }
+    return [];
+  }
 
-  //       // Add image file if selected
-  //       if (imageFile != null) {
-  //         final bytes = await imageFile.readAsBytes();
-  //         request.files.add(
-  //           http.MultipartFile.fromBytes(
-  //             'image',
-  //             bytes,
-  //             filename: imageFile.name,
-  //           ),
-  //         );
-  //       }
+  static Future<bool> addToWishlist({
+    required int userId,
+    required int productId,
+  }) async {
+    try {
+      final response = await _postJson(
+          '/wishlist/add/', {'user_id': userId, 'product_id': productId});
+      return _isSuccessStatus(response.statusCode);
+    } catch (e) {
+      _logError('Error adding to wishlist: $e');
+      return false;
+    }
+  }
 
-  //       final response = await request.send();
-  //       final responseData = await response.stream.bytesToString();
+  static Future<bool> removeFromWishlist({
+    required int userId,
+    required int productId,
+  }) async {
+    try {
+      final response = await _postJson(
+          '/wishlist/remove/', {'user_id': userId, 'product_id': productId});
+      return _isSuccessStatus(response.statusCode);
+    } catch (e) {
+      _logError('Error removing from wishlist: $e');
+      return false;
+    }
+  }
 
-  //       _log('Update product response: ${response.statusCode}');
+  static Future<bool> isProductInWishlist({
+    required int userId,
+    required int productId,
+  }) async {
+    try {
+      final response = await _getJson('/wishlist/check/$userId/$productId/');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['is_in_wishlist'] ?? false;
+      }
+    } catch (e) {
+      _logError('Error checking wishlist: $e');
+    }
+    return false;
+  }
 
-  //       if (response.statusCode == 200) {
-  //         try {
-  //           final data = jsonDecode(responseData);
-  //           return {'success': true, 'data': data};
-  //         } catch (e) {
-  //           return {'success': true, 'data': responseData};
-  //         }
-  //       } else {
-  //         return {
-  //           'success': false,
-  //           'error': 'HTTP ${response.statusCode}: $responseData',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Error updating product: $e');
-  //       return {'success': false, 'error': 'Network error: $e'};
-  //     }
-  //   }
+  // ─────────────────────────────────────────────
+  //  CATEGORY APIs
+  // ─────────────────────────────────────────────
 
-  //   static Future<bool> addToCart({
-  //     required int userId,
-  //     required int productId,
-  //     int quantity = 1,
-  //   }) async {
-  //     try {
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/cart/add/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode({
-  //           "user_id": userId,
-  //           "product_id": productId,
-  //           "quantity": quantity,
-  //         }),
-  //       );
+  static Future<Map<String, dynamic>> getCategories() async {
+    try {
+      final response = await _getJson('/categories/');
+      _log('Categories: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'error': 'Categories endpoint not found. Deploy the latest backend.',
+        };
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      _logError('Error fetching categories: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
-  //       return response.statusCode == 200;
-  //     } catch (e) {
-  //       _logError('Error adding to cart: $e');
-  //       return false;
-  //     }
-  //   }
+  static Future<Map<String, dynamic>> createCategory({
+    required String name,
+    required String displayName,
+    String? description,
+  }) async {
+    try {
+      final response = await _postJson('/categories/create/', {
+        'name': name,
+        'display_name': displayName,
+        'description': description ?? '',
+      });
+      if (response.statusCode == 201) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      _logError('Error creating category: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
-  //   static Future<List<dynamic>> getCart(int userId) async {
-  //     try {
-  //       final response = await http.get(Uri.parse('$baseUrl/cart/$userId/'));
+  static Future<Map<String, dynamic>> deleteCategory(int categoryId) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/categories/delete/$categoryId/'))
+          .timeout(_requestTimeout);
+      if (response.statusCode == 200) return {'success': true};
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      _logError('Error deleting category: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 
-  //       if (response.statusCode == 200) {
-  //         return jsonDecode(response.body);
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching cart: $e');
-  //     }
-  //     return [];
-  //   }
+  // ─────────────────────────────────────────────
+  //  ADDRESS APIs
+  // ─────────────────────────────────────────────
 
-  //   static Future<bool> updateCartItem({
-  //     required int userId,
-  //     required int productId,
-  //     required int quantity,
-  //   }) async {
-  //     try {
-  //       final response = await http.put(
-  //         Uri.parse('$baseUrl/cart/update/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode({
-  //           "user_id": userId,
-  //           "product_id": productId,
-  //           "quantity": quantity,
-  //         }),
-  //       );
-  //       return response.statusCode == 200;
-  //     } catch (e) {
-  //       _logError('Error updating cart item: $e');
-  //       return false;
-  //     }
-  //   }
+  static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
+    try {
+      final response = await _getJson('/addresses/',
+          queryParams: {'user_id': userId.toString()});
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 
-  //   static Future<bool> removeFromCart({
-  //     required int userId,
-  //     required int productId,
-  //   }) async {
-  //     try {
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/cart/remove/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode({"user_id": userId, "product_id": productId}),
-  //       );
-  //       return response.statusCode == 200;
-  //     } catch (e) {
-  //       _logError('Error removing from cart: $e');
-  //       return false;
-  //     }
-  //   }
+  static Future<Map<String, dynamic>> createAddress({
+    required int userId,
+    required Map<String, dynamic> addressData,
+  }) async {
+    try {
+      final response = await _postJson(
+          '/addresses/create/', {'user_id': userId, ...addressData});
+      if (response.statusCode == 201) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 
-  //   static Future<Map<String, dynamic>> checkoutCart({
-  //     required int userId,
-  //     required List<int> productIds,
-  //     int? addressId,
-  //     Map<String, dynamic>? shippingAddress,
-  //     required String paymentMethod,
-  //   }) async {
-  //     try {
-  //       final body = {
-  //         'user_id': userId,
-  //         'product_ids': productIds,
-  //         'payment_method': paymentMethod,
-  //       };
+  static Future<Map<String, dynamic>> deleteAddress({
+    required int addressId,
+    required int userId,
+  }) async {
+    try {
+      final response = await http
+          .delete(Uri.parse(
+              '$baseUrl/addresses/$addressId/delete/?user_id=$userId'))
+          .timeout(_requestTimeout);
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      }
+      return {
+        'success': false,
+        'error': 'HTTP ${response.statusCode}: ${response.body}',
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 
-  //       if (addressId != null) {
-  //         body['address_id'] = addressId;
-  //       } else if (shippingAddress != null) {
-  //         body['shipping_address'] = shippingAddress;
-  //       }
+  // ─────────────────────────────────────────────
+  //  EXCHANGE RATE
+  // ─────────────────────────────────────────────
 
-  //       _log('Sending Checkout Body: ${jsonEncode(body)}');
-
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/cart/checkout/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode(body),
-  //       );
-
-  //       final decodedResponse = jsonDecode(response.body);
-
-  //       if (response.statusCode == 200 || response.statusCode == 201) {
-  //         _log('Checkout Successful');
-  //         return {'success': true, 'data': decodedResponse};
-  //       } else {
-  //         _logError('Checkout Failed: ${response.body}');
-  //         return {
-  //           'success': false,
-  //           'error': decodedResponse['error'] ?? 'Failed to checkout',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Checkout Exception: $e');
-  //       return {'success': false, 'error': e.toString()};
-  //     }
-  //   }
-
-  //   // ============= WISHLIST APIs =============
-
-  //   static Future<List<dynamic>> getWishlist(int userId) async {
-  //     // Backend disabled for static wishlist mode.
-  //     // try {
-  //     //   final response = await http.get(Uri.parse('$baseUrl/wishlist/$userId/'));
-  //     //   if (response.statusCode == 200) {
-  //     //     return jsonDecode(response.body);
-  //     //   }
-  //     // } catch (e) {
-  //     //   _logError('Error fetching wishlist: $e');
-  //     // }
-  //     return [];
-  //   }
-
-  //   static Future<bool> addToWishlist({
-  //     required int userId,
-  //     required int productId,
-  //   }) async {
-  //     // Backend disabled for static wishlist mode.
-  //     // try {
-  //     //   final response = await http.post(
-  //     //     Uri.parse('$baseUrl/wishlist/add/'),
-  //     //     headers: {'Content-Type': 'application/json'},
-  //     //     body: jsonEncode({"user_id": userId, "product_id": productId}),
-  //     //   );
-  //     //   return response.statusCode == 200 || response.statusCode == 201;
-  //     // } catch (e) {
-  //     //   _logError('Error adding to wishlist: $e');
-  //     //   return false;
-  //     // }
-  //     return true;
-  //   }
-
-  //   static Future<bool> removeFromWishlist({
-  //     required int userId,
-  //     required int productId,
-  //   }) async {
-  //     // Backend disabled for static wishlist mode.
-  //     // try {
-  //     //   final response = await http.post(
-  //     //     Uri.parse('$baseUrl/wishlist/remove/'),
-  //     //     headers: {'Content-Type': 'application/json'},
-  //     //     body: jsonEncode({"user_id": userId, "product_id": productId}),
-  //     //   );
-  //     //   return response.statusCode == 200;
-  //     // } catch (e) {
-  //     //   _logError('Error removing from wishlist: $e');
-  //     //   return false;
-  //     // }
-  //     return true;
-  //   }
-
-  //   static Future<bool> isProductInWishlist({
-  //     required int userId,
-  //     required int productId,
-  //   }) async {
-  //     // Backend disabled for static wishlist mode.
-  //     // try {
-  //     //   final response = await http.get(
-  //     //     Uri.parse('$baseUrl/wishlist/check/$userId/$productId/'),
-  //     //   );
-  //     //   if (response.statusCode == 200) {
-  //     //     final data = jsonDecode(response.body);
-  //     //     return data['is_in_wishlist'] ?? false;
-  //     //   }
-  //     // } catch (e) {
-  //     //   _logError('Error checking wishlist: $e');
-  //     // }
-  //     return false;
-  //   }
-
-  //   static Future<int> getCartCount(int userId) async {
-  //     final cart = await getCart(userId);
-  //     int count = 0;
-  //     for (var item in cart) {
-  //       count += item['quantity'] as int;
-  //     }
-  //     return count;
-  //   }
-
-  //   static Future<double> getExchangeRate() async {
-  //     try {
-  //       final response = await http.get(
-  //         Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'),
-  //       );
-  //       if (response.statusCode == 200) {
-  //         final data = jsonDecode(response.body);
-  //         return data['rates']['INR'] ?? 83.0;
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching exchange rate: $e');
-  //     }
-  //     return 83.0;
-  //   }
-
-  //   // ================= CATEGORY APIs =================
-
-  //   static Future<Map<String, dynamic>> getCategories() async {
-  //     try {
-  //       final uri = Uri.parse('$baseUrl/categories/');
-  //       _log('Fetching categories from: $uri');
-  //       final response = await http.get(uri);
-  //       _log('Categories response: ${response.statusCode}');
-
-  //       if (response.statusCode == 200) {
-  //         final data = jsonDecode(response.body);
-  //         return {'success': true, 'data': data};
-  //       } else if (response.statusCode == 404) {
-  //         return {
-  //           'success': false,
-  //           'error':
-  //               'Categories endpoint not found on the server. Deploy the latest backend changes.',
-  //         };
-  //       } else {
-  //         return {
-  //           'success': false,
-  //           'error': 'HTTP ${response.statusCode}: ${response.body}',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Error fetching categories: $e');
-  //       return {'success': false, 'error': 'Network error: $e'};
-  //     }
-  //   }
-
-  //   static Future<Map<String, dynamic>> createCategory({
-  //     required String name,
-  //     required String displayName,
-  //     String? description,
-  //   }) async {
-  //     try {
-  //       _log('Creating category: $name');
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/categories/create/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode({
-  //           'name': name,
-  //           'display_name': displayName,
-  //           'description': description ?? '',
-  //         }),
-  //       );
-
-  //       _log('Create category response: ${response.statusCode}');
-
-  //       if (response.statusCode == 201) {
-  //         final data = jsonDecode(response.body);
-  //         return {'success': true, 'data': data};
-  //       } else if (response.statusCode == 404) {
-  //         return {
-  //           'success': false,
-  //           'error':
-  //               'Create category endpoint not found on the server. Deploy the latest backend changes.',
-  //         };
-  //       } else {
-  //         return {
-  //           'success': false,
-  //           'error': 'HTTP ${response.statusCode}: ${response.body}',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Error creating category: $e');
-  //       return {'success': false, 'error': 'Network error: $e'};
-  //     }
-  //   }
-
-  //   static Future<Map<String, dynamic>> deleteCategory(int categoryId) async {
-  //     try {
-  //       _log('Deleting category ID: $categoryId');
-  //       final response = await http.delete(
-  //         Uri.parse('$baseUrl/categories/delete/$categoryId/'),
-  //       );
-
-  //       _log('Delete category response: ${response.statusCode}');
-
-  //       if (response.statusCode == 200) {
-  //         return {'success': true};
-  //       } else if (response.statusCode == 404) {
-  //         return {
-  //           'success': false,
-  //           'error':
-  //               'Delete category endpoint not found on the server. Deploy the latest backend changes.',
-  //         };
-  //       } else {
-  //         return {
-  //           'success': false,
-  //           'error': 'HTTP ${response.statusCode}: ${response.body}',
-  //         };
-  //       }
-  //     } catch (e) {
-  //       _logError('Error deleting category: $e');
-  //       return {'success': false, 'error': 'Network error: $e'};
-  //     }
-  //   }
-
-  //   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
-  //     try {
-  //       final response = await http.get(
-  //         Uri.parse('$baseUrl/addresses/?user_id=$userId'),
-  //       );
-
-  //       if (response.statusCode == 200) {
-  //         return jsonDecode(response.body);
-  //       }
-  //       return {'error': 'Failed to fetch addresses'};
-  //     } catch (e) {
-  //       return {'error': e.toString()};
-  //     }
-  //   }
-
-  //   static Future<Map<String, dynamic>> createAddress({
-  //     required int userId,
-  //     required Map<String, dynamic> addressData,
-  //   }) async {
-  //     try {
-  //       final response = await http.post(
-  //         Uri.parse('$baseUrl/addresses/create/'),
-  //         headers: {'Content-Type': 'application/json'},
-  //         body: jsonEncode({'user_id': userId, ...addressData}),
-  //       );
-
-  //       if (response.statusCode == 201) {
-  //         return jsonDecode(response.body);
-  //       }
-  //       return {'error': 'Failed to create address'};
-  //     } catch (e) {
-  //       return {'error': e.toString()};
-  //     }
-  //   }
-
-  // static Future<Map<String, dynamic>> deleteAddress({
-  //   required int addressId,
-  //   required int userId,
-  // }) async {
-  //   try {
-  //     final response = await http.delete(
-  //       Uri.parse('$baseUrl/addresses/$addressId/delete/?user_id=$userId'),
-  //     );
-
-  //     if (response.statusCode == 200) {
-  //       return jsonDecode(response.body);
-  //     }
-  //     return {'error': 'Failed to delete address'};
-  //   } catch (e) {
-  //     return {'error': e.toString()};
-  //   }
-  // }
+  static Future<double> getExchangeRate() async {
+    try {
+      final response = await http
+          .get(Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'))
+          .timeout(_requestTimeout);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return (data['rates']['INR'] as num?)?.toDouble() ?? 83.0;
+      }
+    } catch (e) {
+      _logError('Error fetching exchange rate: $e');
+    }
+    return 83.0;
+  }
 }
+
+
+
+
+
+
+
+
+// import 'dart:async';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
+// import 'package:image_picker/image_picker.dart';
+
+// class ApiService {
+//   static const String baseUrl = 'http://192.168.1.10:8000/api';
+
+//   static const bool debugMode = true;
+//   static const Duration _requestTimeout = Duration(seconds: 30);
+
+//   //   // Helper method to log debug info
+//   static void _log(String message) {
+//     if (debugMode) {
+//       print('🔵 [API] $message');
+//     }
+//   }
+
+//   //   // Helper method to log errors
+//   static void _logError(String message) {
+//     if (debugMode) {
+//       print('🔴 [API ERROR] $message');
+//     }
+//   }
+
+//   static Map<String, String> get _jsonHeaders => const {
+//     'Content-Type': 'application/json',
+//     'Accept': 'application/json',
+//   };
+
+//   static dynamic _decodeBody(http.Response response) {
+//     if (response.body.isEmpty) return <String, dynamic>{};
+//     return jsonDecode(response.body);
+//   }
+
+//   static String _errorMessage(dynamic data, String fallback) {
+//     if (data is Map<String, dynamic>) {
+//       return (data['error'] ?? data['detail'] ?? data['message'] ?? fallback)
+//           .toString();
+//     }
+//     if (data is Map) {
+//       return (data['error'] ?? data['detail'] ?? data['message'] ?? fallback)
+//           .toString();
+//     }
+//     if (data is String && data.isNotEmpty) return data;
+//     return fallback;
+//   }
+
+//   static bool _isSuccessStatus(int statusCode) =>
+//       statusCode >= 200 && statusCode < 300;
+
+//   static Future<http.Response> _postJson(
+//     String path,
+//     Map<String, dynamic> body,
+//   ) {
+//     final normalizedPath = path.startsWith('/') ? path : '/$path';
+//     final uri = Uri.parse('$baseUrl$normalizedPath');
+//     _log('POST $uri');
+//     _log('Request body: ${jsonEncode(body)}');
+//     return http
+//         .post(uri, headers: _jsonHeaders, body: jsonEncode(body))
+//         .timeout(_requestTimeout);
+//   }
+
+//   // Ping server to wake it up (useful for Render free tier)
+//   static Future<bool> pingServer() async {
+//     try {
+//       _log('Pinging server to wake it up...');
+//       final response = await http
+//           .get(Uri.parse('$baseUrl/products/'))
+//           .timeout(const Duration(seconds: 30));
+//       _log('Ping response: ${response.statusCode}');
+//       return response.statusCode == 200;
+//     } catch (e) {
+//       _logError('Ping failed: $e');
+//       return false;
+//     }
+//   }
+
+//   //   // ============= USER APIs =============
+
+//   static Future<Map<String, dynamic>> loginUser({
+//     required String email,
+//     required String password,
+//   }) async {
+//     try {
+//       _log('Attempting login to: $baseUrl/login/');
+//       _log('Email: $email');
+
+//       final response = await _postJson('/login/', {
+//         'email': email,
+//         'password': password,
+//       });
+
+//       _log('Response status: ${response.statusCode}');
+//       _log('Response headers: ${response.headers}');
+//       _log('Response body: ${response.body}');
+
+//       // Handle empty response body
+//       if (response.body.isEmpty) {
+//         _logError('Empty response body received');
+//         return {
+//           'success': false,
+//           'error':
+//               'Server returned empty response. Status: ${response.statusCode}',
+//         };
+//       }
+
+//       try {
+//         final data = _decodeBody(response);
+
+//         if (_isSuccessStatus(response.statusCode)) {
+//           _log('Login successful');
+//           return {'success': true, 'data': data};
+//         }  else {
+//   _logError('Login failed with status: ${response.statusCode}');
+//   return {
+//     'success': false,
+//     'error': _errorMessage(
+//       data,
+//       'Login failed. Status: ${response.statusCode}',
+//     ),
+//     'errors': data['errors'],  // ✅ pass errors at the top-level map
+//   };
+// }
+//       } catch (jsonError) {
+//         _logError('JSON parsing error: $jsonError');
+//         _logError('Raw response: ${response.body}');
+//         return {
+//           'success': false,
+//           'error':
+//               'Server error. Status: ${response.statusCode}\n${response.body}',
+//         };
+//       }
+//     } on TimeoutException catch (e) {
+//       _logError('Request timeout: $e');
+//       return {
+//         'success': false,
+//         'error':
+//             'Request timed out. The server might be starting up. Please try again.',
+//       };
+//     } catch (e) {
+//       _logError('Network error: $e');
+//       return {
+//         'success': false,
+//         'error': 'Network error: $e\nPlease check your connection.',
+//       };
+//     }
+//   }
+
+//   //   // Login with automatic server wake-up
+//   static Future<Map<String, dynamic>> loginUserWithWakeUp({
+//     required String email,
+//     required String password,
+//   }) async {
+//     _log('Attempting to wake up server before login...');
+//     await pingServer();
+//     await Future.delayed(Duration(seconds: 2)); // Give server time to start
+//     return loginUser(email: email, password: password);
+//   }
+
+//   static Future<Map<String, dynamic>> forgotPassword({
+//     required String email,
+//   }) async {
+//     try {
+//       _log('Requesting password reset for: $email');
+
+//       final response = await _postJson('/forgot-password/', {'email': email});
+
+//       _log('Forgot password status: ${response.statusCode}');
+//       _log('Forgot password body: ${response.body}');
+
+//       final data = _decodeBody(response);
+
+//       if (_isSuccessStatus(response.statusCode)) {
+//         return {'success': true, 'data': data};
+//       }
+
+//       return {
+//         'success': false,
+//         'error': _errorMessage(data, 'Unable to send reset request.'),
+//       };
+//     } on TimeoutException catch (e) {
+//       return {'success': false, 'error': 'Request timeout: $e'};
+//     } catch (e) {
+//       return {'success': false, 'error': 'Network error: $e'};
+//     }
+//   }
+
+//   static Future<Map<String, dynamic>> resetPassword({
+//     required String token,
+//     required String email,
+//     required String password,
+//     required String passwordConfirmation,
+//   }) async {
+//     try {
+//       final response = await _postJson('/reset-password/', {
+//         'token': token,
+//         'email': email,
+//         'password': password,
+//         'password_confirmation': passwordConfirmation,
+//       });
+
+//       _log('Reset password status: ${response.statusCode}');
+//       _log('Reset password body: ${response.body}');
+
+//       final data = _decodeBody(response);
+
+//       if (_isSuccessStatus(response.statusCode)) {
+//         return {'success': true, 'data': data};
+//       }
+
+//       return {'success': false, 'error': _errorMessage(data, 'Reset failed')};
+//     } on TimeoutException catch (e) {
+//       return {'success': false, 'error': 'Request timeout: $e'};
+//     } catch (e) {
+//       return {'success': false, 'error': 'Network error: $e'};
+//     }
+//   }
+
+//   static Future<Map<String, dynamic>> registerUser({
+//     required String fullName,
+//     required String email,
+//     required String password,
+//     required String passwordConfirmation,
+//   }) async {
+//     try {
+//       _log('Attempting registration to: $baseUrl/register/');
+
+//       final response = await _postJson('/register/', {
+//         'name': fullName,
+//         'email': email,
+//         'password': password,
+//         'password_confirmation': passwordConfirmation,
+//       });
+
+//       _log('Response status: ${response.statusCode}');
+//       _log('Response body: ${response.body}');
+
+//       if (response.body.isEmpty) {
+//         return {'success': false, 'error': 'Empty response from server'};
+//       }
+
+//       final data = _decodeBody(response);
+
+//       if (_isSuccessStatus(response.statusCode)) {
+//         return {'success': true, 'data': data};
+//       } else {
+//         return {'success': false, 'error': data};
+//       }
+//     } on TimeoutException catch (e) {
+//       return {'success': false, 'error': 'Request timeout: $e'};
+//     } catch (e) {
+//       return {'success': false, 'error': 'Network error: $e'};
+//     }
+//   }
+
+//   static Future<Map<String, dynamic>> updateUser({
+//     required int id,
+//     String? fullName,
+//     String? email,
+//     String? phone,
+//     XFile? imageFile,
+//   }) async {
+//     try {
+//       _log('Updating user ID: $id');
+
+//       final uri = Uri.parse('$baseUrl/users/partial/$id/');
+//       final request = http.MultipartRequest('PATCH', uri);
+
+//       if (fullName != null) {
+//         request.fields['full_name'] = fullName;
+//       }
+//       if (email != null) {
+//         request.fields['email'] = email;
+//       }
+//       if (phone != null) {
+//         request.fields['phone'] = phone;
+//       }
+//       if (imageFile != null) {
+//         final bytes = await imageFile.readAsBytes();
+//         request.files.add(
+//           http.MultipartFile.fromBytes(
+//             'image',
+//             bytes,
+//             filename: imageFile.name,
+//           ),
+//         );
+//       }
+
+//       final response = await request.send();
+//       final responseData = await response.stream.bytesToString();
+
+//       _log('Update user response: ${response.statusCode}');
+//       _log('Response data: $responseData');
+
+//       if (response.statusCode == 200) {
+//         final data = jsonDecode(responseData);
+//         return {'success': true, 'data': data};
+//       }
+//       return {
+//         'success': false,
+//         'error': 'HTTP ${response.statusCode}: $responseData',
+//       };
+//     } catch (e) {
+//       _logError('Error updating user: $e');
+//       return {'success': false, 'error': 'Network error: $e'};
+//     }
+//   }
+
+//   //   // ============= PRODUCT APIs =============
+
+//   //   static Future<List<Product>> getProducts({String? category}) async {
+//   //     try {
+//   //       final uri = Uri.parse('$baseUrl/products/').replace(
+//   //         queryParameters: category != null && category.isNotEmpty
+//   //             ? {'category': category}
+//   //             : null,
+//   //       );
+
+//   //       _log('Fetching products from: $uri');
+//   //       final response = await http.get(uri);
+
+//   //       _log('Products response status: ${response.statusCode}');
+
+//   //       if (response.statusCode == 200) {
+//   //         List<dynamic> data = jsonDecode(response.body);
+//   //         _log('Retrieved ${data.length} products');
+//   //         return data.map((json) => Product.fromJson(json)).toList();
+//   //       } else {
+//   //         _logError('Failed to fetch products: ${response.statusCode}');
+//   //         _logError('Products response body: ${response.body}');
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching products: $e');
+//   //     }
+//   //     return [];
+//   //   }
+
+//   //   static Future<List<Product>> getAllProductsAdmin() async {
+//   //     try {
+//   //       _log('Fetching all admin products');
+//   //       final response = await http.get(Uri.parse('$baseUrl/admin/products/'));
+
+//   //       _log('Admin products response: ${response.statusCode}');
+//   //       if (response.statusCode == 200) {
+//   //         List<dynamic> data = jsonDecode(response.body);
+//   //         return data.map((json) => Product.fromJson(json)).toList();
+//   //       } else {
+//   //         _logError('Admin products response body: ${response.body}');
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching admin products: $e');
+//   //     }
+//   //     return [];
+//   //   }
+
+//   static Future<Map<String, dynamic>?> getUser({required int id}) async {
+//     try {
+//       _log('Fetching user profile for ID: $id');
+//       final response = await http.get(Uri.parse('$baseUrl/users/$id/'));
+//       _log('Get user response: ${response.statusCode}');
+//       _log('Get user body: ${response.body}');
+
+//       if (response.statusCode == 200) {
+//         final data = jsonDecode(response.body);
+//         return data is Map<String, dynamic> ? data : null;
+//       }
+//       return null;
+//     } catch (e) {
+//       _logError('Error fetching user profile: $e');
+//       return null;
+//     }
+//   }
+
+//   //   static Future<Product?> getProductDetail(int id) async {
+//   //     try {
+//   //       _log('Fetching product detail for ID: $id');
+//   //       final response = await http.get(Uri.parse('$baseUrl/products/$id/'));
+
+//   //       if (response.statusCode == 200) {
+//   //         return Product.fromJson(jsonDecode(response.body));
+//   //       } else {
+//   //         _logError('Failed to fetch product detail: ${response.statusCode}');
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching product detail: $e');
+//   //     }
+//   //     return null;
+//   //   }
+
+//   //   static Future<bool> softDeleteProduct(int id) async {
+//   //     try {
+//   //       final response = await http.delete(
+//   //         Uri.parse('$baseUrl/admin/products/soft-delete/$id/'),
+//   //       );
+//   //       return response.statusCode == 200;
+//   //     } catch (e) {
+//   //       _logError('Error soft deleting product: $e');
+//   //       return false;
+//   //     }
+//   //   }
+
+//   //   static Future<bool> restoreProduct(int id) async {
+//   //     try {
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/admin/products/restore/$id/'),
+//   //       );
+//   //       return response.statusCode == 200;
+//   //     } catch (e) {
+//   //       _logError('Error restoring product: $e');
+//   //       return false;
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> createProduct({
+//   //     required String name,
+//   //     required String description,
+//   //     required double price,
+//   //     required int categoryId,
+//   //     XFile? imageFile,
+//   //     required int stock,
+//   //     double rating = 0.0,
+//   //     int? skuId,
+//   //   }) async {
+//   //     try {
+//   //       _log('Creating product: $name');
+
+//   //       var request = http.MultipartRequest(
+//   //         'POST',
+//   //         Uri.parse('$baseUrl/admin/products/create/'),
+//   //       );
+
+//   //       // Add text fields
+//   //       request.fields['name'] = name;
+//   //       request.fields['description'] = description;
+//   //       request.fields['price'] = price.toString();
+//   //       request.fields['category'] = categoryId.toString();
+//   //       request.fields['stock'] = stock.toString();
+//   //       request.fields['rating'] = rating.toString();
+//   //       if (skuId != null) {
+//   //         request.fields['sku_id'] = skuId.toString();
+//   //       }
+
+//   //       // Add image file if selected
+//   //       if (imageFile != null) {
+//   //         final bytes = await imageFile.readAsBytes();
+//   //         request.files.add(
+//   //           http.MultipartFile.fromBytes(
+//   //             'image',
+//   //             bytes,
+//   //             filename: imageFile.name,
+//   //           ),
+//   //         );
+//   //         _log('Image attached: ${imageFile.name}');
+//   //       }
+
+//   //       final response = await request.send();
+//   //       final responseData = await response.stream.bytesToString();
+
+//   //       _log('Create product response: ${response.statusCode}');
+//   //       _log('Response data: $responseData');
+
+//   //       if (response.statusCode == 201) {
+//   //         try {
+//   //           final data = jsonDecode(responseData);
+//   //           return {'success': true, 'data': data};
+//   //         } catch (e) {
+//   //           return {'success': true, 'data': responseData};
+//   //         }
+//   //       } else {
+//   //         return {
+//   //           'success': false,
+//   //           'error': 'HTTP ${response.statusCode}: $responseData',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error creating product: $e');
+//   //       return {'success': false, 'error': 'Network error: $e'};
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> updateProduct({
+//   //     required int id,
+//   //     required String name,
+//   //     required String description,
+//   //     required double price,
+//   //     required int categoryId,
+//   //     XFile? imageFile,
+//   //     required int stock,
+//   //     double rating = 0.0,
+//   //     int? skuId,
+//   //     bool removeImage = false,
+//   //   }) async {
+//   //     try {
+//   //       _log('Updating product ID: $id');
+
+//   //       var request = http.MultipartRequest(
+//   //         'PUT',
+//   //         Uri.parse('$baseUrl/admin/products/update/$id/'),
+//   //       );
+
+//   //       // Add text fields
+//   //       request.fields['name'] = name;
+//   //       request.fields['description'] = description;
+//   //       request.fields['price'] = price.toString();
+//   //       request.fields['category'] = categoryId.toString();
+//   //       request.fields['stock'] = stock.toString();
+//   //       request.fields['rating'] = rating.toString();
+//   //       if (skuId != null) {
+//   //         request.fields['sku_id'] = skuId.toString();
+//   //       }
+//   //       if (removeImage) {
+//   //         request.fields['remove_image'] = 'true';
+//   //       }
+
+//   //       // Add image file if selected
+//   //       if (imageFile != null) {
+//   //         final bytes = await imageFile.readAsBytes();
+//   //         request.files.add(
+//   //           http.MultipartFile.fromBytes(
+//   //             'image',
+//   //             bytes,
+//   //             filename: imageFile.name,
+//   //           ),
+//   //         );
+//   //       }
+
+//   //       final response = await request.send();
+//   //       final responseData = await response.stream.bytesToString();
+
+//   //       _log('Update product response: ${response.statusCode}');
+
+//   //       if (response.statusCode == 200) {
+//   //         try {
+//   //           final data = jsonDecode(responseData);
+//   //           return {'success': true, 'data': data};
+//   //         } catch (e) {
+//   //           return {'success': true, 'data': responseData};
+//   //         }
+//   //       } else {
+//   //         return {
+//   //           'success': false,
+//   //           'error': 'HTTP ${response.statusCode}: $responseData',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error updating product: $e');
+//   //       return {'success': false, 'error': 'Network error: $e'};
+//   //     }
+//   //   }
+
+//   //   static Future<bool> addToCart({
+//   //     required int userId,
+//   //     required int productId,
+//   //     int quantity = 1,
+//   //   }) async {
+//   //     try {
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/cart/add/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode({
+//   //           "user_id": userId,
+//   //           "product_id": productId,
+//   //           "quantity": quantity,
+//   //         }),
+//   //       );
+
+//   //       return response.statusCode == 200;
+//   //     } catch (e) {
+//   //       _logError('Error adding to cart: $e');
+//   //       return false;
+//   //     }
+//   //   }
+
+//   //   static Future<List<dynamic>> getCart(int userId) async {
+//   //     try {
+//   //       final response = await http.get(Uri.parse('$baseUrl/cart/$userId/'));
+
+//   //       if (response.statusCode == 200) {
+//   //         return jsonDecode(response.body);
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching cart: $e');
+//   //     }
+//   //     return [];
+//   //   }
+
+//   //   static Future<bool> updateCartItem({
+//   //     required int userId,
+//   //     required int productId,
+//   //     required int quantity,
+//   //   }) async {
+//   //     try {
+//   //       final response = await http.put(
+//   //         Uri.parse('$baseUrl/cart/update/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode({
+//   //           "user_id": userId,
+//   //           "product_id": productId,
+//   //           "quantity": quantity,
+//   //         }),
+//   //       );
+//   //       return response.statusCode == 200;
+//   //     } catch (e) {
+//   //       _logError('Error updating cart item: $e');
+//   //       return false;
+//   //     }
+//   //   }
+
+//   //   static Future<bool> removeFromCart({
+//   //     required int userId,
+//   //     required int productId,
+//   //   }) async {
+//   //     try {
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/cart/remove/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode({"user_id": userId, "product_id": productId}),
+//   //       );
+//   //       return response.statusCode == 200;
+//   //     } catch (e) {
+//   //       _logError('Error removing from cart: $e');
+//   //       return false;
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> checkoutCart({
+//   //     required int userId,
+//   //     required List<int> productIds,
+//   //     int? addressId,
+//   //     Map<String, dynamic>? shippingAddress,
+//   //     required String paymentMethod,
+//   //   }) async {
+//   //     try {
+//   //       final body = {
+//   //         'user_id': userId,
+//   //         'product_ids': productIds,
+//   //         'payment_method': paymentMethod,
+//   //       };
+
+//   //       if (addressId != null) {
+//   //         body['address_id'] = addressId;
+//   //       } else if (shippingAddress != null) {
+//   //         body['shipping_address'] = shippingAddress;
+//   //       }
+
+//   //       _log('Sending Checkout Body: ${jsonEncode(body)}');
+
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/cart/checkout/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode(body),
+//   //       );
+
+//   //       final decodedResponse = jsonDecode(response.body);
+
+//   //       if (response.statusCode == 200 || response.statusCode == 201) {
+//   //         _log('Checkout Successful');
+//   //         return {'success': true, 'data': decodedResponse};
+//   //       } else {
+//   //         _logError('Checkout Failed: ${response.body}');
+//   //         return {
+//   //           'success': false,
+//   //           'error': decodedResponse['error'] ?? 'Failed to checkout',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Checkout Exception: $e');
+//   //       return {'success': false, 'error': e.toString()};
+//   //     }
+//   //   }
+
+//   //   // ============= WISHLIST APIs =============
+
+//   //   static Future<List<dynamic>> getWishlist(int userId) async {
+//   //     // Backend disabled for static wishlist mode.
+//   //     // try {
+//   //     //   final response = await http.get(Uri.parse('$baseUrl/wishlist/$userId/'));
+//   //     //   if (response.statusCode == 200) {
+//   //     //     return jsonDecode(response.body);
+//   //     //   }
+//   //     // } catch (e) {
+//   //     //   _logError('Error fetching wishlist: $e');
+//   //     // }
+//   //     return [];
+//   //   }
+
+//   //   static Future<bool> addToWishlist({
+//   //     required int userId,
+//   //     required int productId,
+//   //   }) async {
+//   //     // Backend disabled for static wishlist mode.
+//   //     // try {
+//   //     //   final response = await http.post(
+//   //     //     Uri.parse('$baseUrl/wishlist/add/'),
+//   //     //     headers: {'Content-Type': 'application/json'},
+//   //     //     body: jsonEncode({"user_id": userId, "product_id": productId}),
+//   //     //   );
+//   //     //   return response.statusCode == 200 || response.statusCode == 201;
+//   //     // } catch (e) {
+//   //     //   _logError('Error adding to wishlist: $e');
+//   //     //   return false;
+//   //     // }
+//   //     return true;
+//   //   }
+
+//   //   static Future<bool> removeFromWishlist({
+//   //     required int userId,
+//   //     required int productId,
+//   //   }) async {
+//   //     // Backend disabled for static wishlist mode.
+//   //     // try {
+//   //     //   final response = await http.post(
+//   //     //     Uri.parse('$baseUrl/wishlist/remove/'),
+//   //     //     headers: {'Content-Type': 'application/json'},
+//   //     //     body: jsonEncode({"user_id": userId, "product_id": productId}),
+//   //     //   );
+//   //     //   return response.statusCode == 200;
+//   //     // } catch (e) {
+//   //     //   _logError('Error removing from wishlist: $e');
+//   //     //   return false;
+//   //     // }
+//   //     return true;
+//   //   }
+
+//   //   static Future<bool> isProductInWishlist({
+//   //     required int userId,
+//   //     required int productId,
+//   //   }) async {
+//   //     // Backend disabled for static wishlist mode.
+//   //     // try {
+//   //     //   final response = await http.get(
+//   //     //     Uri.parse('$baseUrl/wishlist/check/$userId/$productId/'),
+//   //     //   );
+//   //     //   if (response.statusCode == 200) {
+//   //     //     final data = jsonDecode(response.body);
+//   //     //     return data['is_in_wishlist'] ?? false;
+//   //     //   }
+//   //     // } catch (e) {
+//   //     //   _logError('Error checking wishlist: $e');
+//   //     // }
+//   //     return false;
+//   //   }
+
+//   //   static Future<int> getCartCount(int userId) async {
+//   //     final cart = await getCart(userId);
+//   //     int count = 0;
+//   //     for (var item in cart) {
+//   //       count += item['quantity'] as int;
+//   //     }
+//   //     return count;
+//   //   }
+
+//   //   static Future<double> getExchangeRate() async {
+//   //     try {
+//   //       final response = await http.get(
+//   //         Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'),
+//   //       );
+//   //       if (response.statusCode == 200) {
+//   //         final data = jsonDecode(response.body);
+//   //         return data['rates']['INR'] ?? 83.0;
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching exchange rate: $e');
+//   //     }
+//   //     return 83.0;
+//   //   }
+
+//   //   // ================= CATEGORY APIs =================
+
+//   //   static Future<Map<String, dynamic>> getCategories() async {
+//   //     try {
+//   //       final uri = Uri.parse('$baseUrl/categories/');
+//   //       _log('Fetching categories from: $uri');
+//   //       final response = await http.get(uri);
+//   //       _log('Categories response: ${response.statusCode}');
+
+//   //       if (response.statusCode == 200) {
+//   //         final data = jsonDecode(response.body);
+//   //         return {'success': true, 'data': data};
+//   //       } else if (response.statusCode == 404) {
+//   //         return {
+//   //           'success': false,
+//   //           'error':
+//   //               'Categories endpoint not found on the server. Deploy the latest backend changes.',
+//   //         };
+//   //       } else {
+//   //         return {
+//   //           'success': false,
+//   //           'error': 'HTTP ${response.statusCode}: ${response.body}',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error fetching categories: $e');
+//   //       return {'success': false, 'error': 'Network error: $e'};
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> createCategory({
+//   //     required String name,
+//   //     required String displayName,
+//   //     String? description,
+//   //   }) async {
+//   //     try {
+//   //       _log('Creating category: $name');
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/categories/create/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode({
+//   //           'name': name,
+//   //           'display_name': displayName,
+//   //           'description': description ?? '',
+//   //         }),
+//   //       );
+
+//   //       _log('Create category response: ${response.statusCode}');
+
+//   //       if (response.statusCode == 201) {
+//   //         final data = jsonDecode(response.body);
+//   //         return {'success': true, 'data': data};
+//   //       } else if (response.statusCode == 404) {
+//   //         return {
+//   //           'success': false,
+//   //           'error':
+//   //               'Create category endpoint not found on the server. Deploy the latest backend changes.',
+//   //         };
+//   //       } else {
+//   //         return {
+//   //           'success': false,
+//   //           'error': 'HTTP ${response.statusCode}: ${response.body}',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error creating category: $e');
+//   //       return {'success': false, 'error': 'Network error: $e'};
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> deleteCategory(int categoryId) async {
+//   //     try {
+//   //       _log('Deleting category ID: $categoryId');
+//   //       final response = await http.delete(
+//   //         Uri.parse('$baseUrl/categories/delete/$categoryId/'),
+//   //       );
+
+//   //       _log('Delete category response: ${response.statusCode}');
+
+//   //       if (response.statusCode == 200) {
+//   //         return {'success': true};
+//   //       } else if (response.statusCode == 404) {
+//   //         return {
+//   //           'success': false,
+//   //           'error':
+//   //               'Delete category endpoint not found on the server. Deploy the latest backend changes.',
+//   //         };
+//   //       } else {
+//   //         return {
+//   //           'success': false,
+//   //           'error': 'HTTP ${response.statusCode}: ${response.body}',
+//   //         };
+//   //       }
+//   //     } catch (e) {
+//   //       _logError('Error deleting category: $e');
+//   //       return {'success': false, 'error': 'Network error: $e'};
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
+//   //     try {
+//   //       final response = await http.get(
+//   //         Uri.parse('$baseUrl/addresses/?user_id=$userId'),
+//   //       );
+
+//   //       if (response.statusCode == 200) {
+//   //         return jsonDecode(response.body);
+//   //       }
+//   //       return {'error': 'Failed to fetch addresses'};
+//   //     } catch (e) {
+//   //       return {'error': e.toString()};
+//   //     }
+//   //   }
+
+//   //   static Future<Map<String, dynamic>> createAddress({
+//   //     required int userId,
+//   //     required Map<String, dynamic> addressData,
+//   //   }) async {
+//   //     try {
+//   //       final response = await http.post(
+//   //         Uri.parse('$baseUrl/addresses/create/'),
+//   //         headers: {'Content-Type': 'application/json'},
+//   //         body: jsonEncode({'user_id': userId, ...addressData}),
+//   //       );
+
+//   //       if (response.statusCode == 201) {
+//   //         return jsonDecode(response.body);
+//   //       }
+//   //       return {'error': 'Failed to create address'};
+//   //     } catch (e) {
+//   //       return {'error': e.toString()};
+//   //     }
+//   //   }
+
+//   // static Future<Map<String, dynamic>> deleteAddress({
+//   //   required int addressId,
+//   //   required int userId,
+//   // }) async {
+//   //   try {
+//   //     final response = await http.delete(
+//   //       Uri.parse('$baseUrl/addresses/$addressId/delete/?user_id=$userId'),
+//   //     );
+
+//   //     if (response.statusCode == 200) {
+//   //       return jsonDecode(response.body);
+//   //     }
+//   //     return {'error': 'Failed to delete address'};
+//   //   } catch (e) {
+//   //     return {'error': e.toString()};
+//   //   }
+//   // }
+// }

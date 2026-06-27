@@ -27,7 +27,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   int currentImageIndex = 0;
   late PageController pageController;
 
-  // ── Related products getter ────────────────────────────────────────
+  ProductVariation? selectedVariation;
+
+  // ── Live price / stock / availability ─────────────────────────────
+  double get _displayPrice => selectedVariation?.price ?? product!.price;
+  int get _displayStock => selectedVariation?.stock ?? product!.stock;
+  bool get _displayInStock => selectedVariation != null
+      ? selectedVariation!.isAvailable && selectedVariation!.stock > 0
+      : product!.isInStock;
+
+  // ── Image list: prepends the variation image when one is selected ──
+  // This drives the carousel so it jumps to the variation's image.
+  List<String> get _displayImages {
+    if (product == null) return [];
+    final base = product!.images.isNotEmpty
+        ? product!.images
+        : [if (product!.imageUrl != null) product!.imageUrl!];
+
+    final varImage = selectedVariation?.image;
+    if (varImage != null && !base.contains(varImage)) {
+      return [varImage, ...base];
+    }
+    return base;
+  }
+
+  // ── Related products ───────────────────────────────────────────────
   List<Product> get _relatedProducts {
     if (product == null) return [];
     return staticProducts
@@ -54,7 +78,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       setState(() => isLoading = false);
       return;
     }
-
     Product? localProduct;
     for (final item in staticProducts) {
       if (item.id == widget.productId) {
@@ -62,36 +85,46 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         break;
       }
     }
-
     setState(() {
       product = localProduct;
       isLoading = false;
     });
   }
 
+  // ── Select / deselect a variation ─────────────────────────────────
+  // Also resets the image carousel to page 0 so the variation image is visible.
+  void _selectVariation(ProductVariation? v) {
+    setState(() {
+      selectedVariation = v;
+      currentImageIndex = 0;
+    });
+    if (pageController.hasClients) {
+      pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   Future<void> _addToCart() async {
     final currentProduct = product;
     if (currentProduct == null || isAddingToCart) return;
-
     setState(() => isAddingToCart = true);
     CartService().addLocalProduct(currentProduct);
-
     if (!mounted) return;
-
     showAppSnackBar(
       context,
       title: 'Success',
       message: 'Added to cart!',
       type: AppSnackBarType.success,
     );
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CartPage(userId: widget.userData['id']),
       ),
     );
-
     setState(() => isAddingToCart = false);
   }
 
@@ -114,7 +147,330 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-  // ── Related products section ───────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────
+  //  Chip builders
+  // ─────────────────────────────────────────────────────────────────
+
+  /// Color swatch chip — circle filled with [v.colorHex], check when selected,
+  /// ✕ overlay when unavailable.
+  Widget _buildColorChip(
+      ProductVariation v, bool isSelected, bool isUnavailable) {
+    final color = v.colorHex != null
+        ? Color(int.parse(v.colorHex!.replaceFirst('#', '0xFF')))
+        : Colors.grey.shade400;
+
+    return GestureDetector(
+      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              border: Border.all(
+                color: isSelected ? kBrandRed : Colors.transparent,
+                width: 2.5,
+              ),
+              boxShadow: [
+                if (isSelected)
+                  BoxShadow(
+                    color: kBrandRed.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: isUnavailable
+                ? const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 18)
+                : (isSelected
+                    ? const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 18)
+                    : null),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            v.label,
+            style: TextStyle(
+              color: isUnavailable
+                  ? kTextMuted.withOpacity(0.4)
+                  : (isSelected ? kBrandRed : kTextDark),
+              fontSize: 11,
+              fontWeight:
+                  isSelected ? FontWeight.w700 : FontWeight.w500,
+              decoration:
+                  isUnavailable ? TextDecoration.lineThrough : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Image-thumbnail chip — shows a small preview of [v.image] above the label.
+  /// Used when a variation carries its own image (e.g. a colour-way or style).
+  Widget _buildImageChip(
+      ProductVariation v, bool isSelected, bool isUnavailable) {
+    return GestureDetector(
+      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 72,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? kBrandRed : kBorder,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: kBrandRed.withOpacity(0.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+          color: Colors.white,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Thumbnail image
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
+              child: Image.network(
+                v.image!,
+                width: 72,
+                height: 64,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 72,
+                  height: 64,
+                  color: kSurface,
+                  child: const Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 22,
+                    color: kTextMuted,
+                  ),
+                ),
+              ),
+            ),
+            // Label bar
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? kBrandRed : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(11)),
+              ),
+              child: Text(
+                v.label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isSelected
+                      ? Colors.white
+                      : (isUnavailable
+                          ? kTextMuted.withOpacity(0.4)
+                          : kTextDark),
+                  fontSize: 11,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  decoration:
+                      isUnavailable ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Plain text chip — the default for size, length, capacity, dpi, material.
+  Widget _buildTextChip(
+      ProductVariation v, bool isSelected, bool isUnavailable) {
+    return GestureDetector(
+      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? kBrandRed
+              : (isUnavailable
+                  ? kBorder.withOpacity(0.3)
+                  : Colors.white),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? kBrandRed : kBorder,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: kBrandRed.withOpacity(0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Text(
+          v.label,
+          style: TextStyle(
+            color: isSelected
+                ? Colors.white
+                : (isUnavailable
+                    ? kTextMuted.withOpacity(0.4)
+                    : kTextDark),
+            fontSize: 13,
+            fontWeight:
+                isSelected ? FontWeight.w700 : FontWeight.w500,
+            decoration:
+                isUnavailable ? TextDecoration.lineThrough : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  Variation Selector
+  // ─────────────────────────────────────────────────────────────────
+
+  Widget _buildVariationSelector() {
+    if (product == null || product!.variations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Group by type preserving insertion order
+    final Map<String, List<ProductVariation>> grouped = {};
+    for (final v in product!.variations) {
+      grouped.putIfAbsent(v.type, () => []).add(v);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(color: kBorder, height: 1),
+        const SizedBox(height: 20),
+
+        ...grouped.entries.map((entry) {
+          final type = entry.key;
+          final options = entry.value;
+          final displayLabel =
+              type[0].toUpperCase() + type.substring(1);
+          final isColorType = type == 'color';
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Section label row ──────────────────────────────────
+              Row(
+                children: [
+                  Text(
+                    displayLabel,
+                    style: const TextStyle(
+                      color: kTextDark,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  // Show selected value inline, e.g. "Size — XL"
+                  if (selectedVariation != null &&
+                      selectedVariation!.type == type) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '— ${selectedVariation!.label}',
+                      style: const TextStyle(
+                        color: kBrandRed,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // ── Chips ───────────────────────────────────────────────
+              Wrap(
+                spacing: isColorType ? 14 : 8,
+                runSpacing: isColorType ? 14 : 8,
+                children: options.map((v) {
+                  final isSelected = selectedVariation?.id == v.id;
+                  final isUnavailable =
+                      !v.isAvailable || v.stock == 0;
+
+                  if (isColorType) {
+                    // Always render color swatches for 'color' type
+                    return _buildColorChip(v, isSelected, isUnavailable);
+                  } else if (v.image != null) {
+                    // Render image-thumbnail chip when variation has its own image
+                    return _buildImageChip(v, isSelected, isUnavailable);
+                  } else {
+                    // Default text chip
+                    return _buildTextChip(v, isSelected, isUnavailable);
+                  }
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          );
+        }),
+
+        // ── Info banner (shown when variation is selected) ───────────
+        if (selectedVariation != null)
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: kBrandRed.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+              border:
+                  Border.all(color: kBrandRed.withOpacity(0.15)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    color: kBrandRed, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    selectedVariation!.image != null
+                        ? 'Preview updated for selected ${selectedVariation!.type}'
+                        : 'Price updated for selected ${selectedVariation!.type}',
+                    style: const TextStyle(
+                      color: kBrandRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Related products ───────────────────────────────────────────────
   Widget _buildRelatedProducts() {
     final related = _relatedProducts;
     if (related.isEmpty) return const SizedBox.shrink();
@@ -124,8 +480,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       children: [
         const Divider(color: kBorder, height: 1),
         const SizedBox(height: 24),
-
-        // Section header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
@@ -145,15 +499,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   const SizedBox(height: 2),
                   Text(
                     'More in ${product!.category.toUpperCase()}',
-                    style: const TextStyle(color: kTextMuted, fontSize: 12),
+                    style:
+                        const TextStyle(color: kTextMuted, fontSize: 12),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
+                    horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: kBrandRed.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -170,10 +523,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ],
           ),
         ),
-
         const SizedBox(height: 16),
-
-        // Horizontal scroll list
         SizedBox(
           height: 230,
           child: ListView.builder(
@@ -213,11 +563,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
+                            top: Radius.circular(16)),
                         child: p.imageUrl != null
                             ? Image.network(
                                 p.imageUrl!,
@@ -228,29 +576,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                   height: 130,
                                   color: kBrandRedSoft,
                                   child: const Icon(
-                                    Icons.image_not_supported,
-                                    color: kBrandRed,
-                                  ),
+                                      Icons.image_not_supported,
+                                      color: kBrandRed),
                                 ),
                               )
                             : Container(
                                 height: 130,
                                 color: kBrandRedSoft,
-                                child: const Icon(
-                                  Icons.shopping_bag,
-                                  color: kBrandRed,
-                                  size: 32,
-                                ),
+                                child: const Icon(Icons.shopping_bag,
+                                    color: kBrandRed, size: 32),
                               ),
                       ),
-
-                      // Info
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                          padding:
+                              const EdgeInsets.fromLTRB(10, 8, 10, 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 p.name,
@@ -277,18 +621,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                   ),
                                   Row(
                                     children: [
-                                      const Icon(
-                                        Icons.star_rounded,
-                                        color: Colors.amber,
-                                        size: 13,
-                                      ),
+                                      const Icon(Icons.star_rounded,
+                                          color: Colors.amber, size: 13),
                                       const SizedBox(width: 2),
                                       Text(
                                         p.rating.toString(),
                                         style: const TextStyle(
-                                          color: kTextMuted,
-                                          fontSize: 11,
-                                        ),
+                                            color: kTextMuted,
+                                            fontSize: 11),
                                       ),
                                     ],
                                   ),
@@ -305,11 +645,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             },
           ),
         ),
-
         const SizedBox(height: 28),
       ],
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  Build
+  // ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -326,27 +669,42 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         backgroundColor: kBackground,
         appBar: _buildAppBar(),
         body: const Center(
-          child: Text(
-            'Product not found',
-            style: TextStyle(color: kTextMuted, fontSize: 16),
-          ),
+          child: Text('Product not found',
+              style: TextStyle(color: kTextMuted, fontSize: 16)),
         ),
       );
     }
 
-    final imageList = product!.images.isNotEmpty
-        ? product!.images
-        : [if (product!.imageUrl != null) product!.imageUrl!];
+    // _displayImages reacts to selectedVariation automatically.
+    final imageList = _displayImages;
+
+    // Cart button logic
+    final bool hasVariations = product!.variations.isNotEmpty;
+    final bool canAddToCart =
+        _displayInStock && (!hasVariations || selectedVariation != null);
+
+    String cartButtonLabel;
+    if (!_displayInStock) {
+      cartButtonLabel = 'Out of Stock';
+    } else if (hasVariations && selectedVariation == null) {
+      final firstType = product!.variations.first.type;
+      cartButtonLabel =
+          'Select ${firstType[0].toUpperCase()}${firstType.substring(1)}';
+    } else if (isAddingToCart) {
+      cartButtonLabel = 'Adding...';
+    } else {
+      cartButtonLabel = 'Add to Cart';
+    }
 
     return Scaffold(
       backgroundColor: kBackground,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         child: Column(
-          // ← outer Column
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image carousel ───────────────────────────────────────
+
+            // ── Image carousel ────────────────────────────────────────
             if (imageList.isNotEmpty)
               Column(
                 children: [
@@ -369,14 +727,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) =>
                                   Container(
-                                    width: double.infinity,
-                                    color: kSurface,
-                                    child: const Icon(
-                                      Icons.image_not_supported_outlined,
-                                      size: 64,
-                                      color: kTextMuted,
-                                    ),
-                                  ),
+                                width: double.infinity,
+                                color: kSurface,
+                                child: const Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 64,
+                                  color: kTextMuted,
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -385,7 +743,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Dots
+                  // Dots indicator
                   if (imageList.length > 1)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -393,7 +751,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         imageList.length,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          margin:
+                              const EdgeInsets.symmetric(horizontal: 3),
                           width: currentImageIndex == index ? 18 : 6,
                           height: 6,
                           decoration: BoxDecoration(
@@ -407,9 +766,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   const SizedBox(height: 12),
 
-                  // Thumbnails
+                  // Thumbnail strip
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16.0),
                     child: SizedBox(
                       height: 72,
                       child: ListView.builder(
@@ -419,31 +779,38 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           final isSelected = currentImageIndex == index;
                           return Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0,
-                            ),
+                                horizontal: 4.0),
                             child: GestureDetector(
-                              onTap: () => pageController.animateToPage(
+                              onTap: () =>
+                                  pageController.animateToPage(
                                 index,
-                                duration: const Duration(milliseconds: 300),
+                                duration:
+                                    const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
                               ),
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
+                                duration:
+                                    const Duration(milliseconds: 200),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected ? kBrandRed : kBorder,
+                                    color: isSelected
+                                        ? kBrandRed
+                                        : kBorder,
                                     width: isSelected ? 1.6 : 1,
                                   ),
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(11),
+                                  borderRadius:
+                                      BorderRadius.circular(11),
                                   child: Image.network(
                                     imageList[index],
                                     width: 68,
                                     height: 68,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (_, __, ___) =>
+                                        Container(
                                       width: 68,
                                       height: 68,
                                       color: kSurface,
@@ -469,26 +836,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 width: double.infinity,
                 height: 340,
                 color: kSurface,
-                child: const Icon(
-                  Icons.shopping_bag_outlined,
-                  size: 80,
-                  color: kTextMuted,
-                ),
+                child: const Icon(Icons.shopping_bag_outlined,
+                    size: 80, color: kTextMuted),
               ),
 
-            // ── Product info ─────────────────────────────────────────
+            // ── Product info ──────────────────────────────────────────
             Padding(
-              // ← Padding ends after its child
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
                   // Category chip
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
+                        horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: kBrandRed.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(6),
@@ -520,11 +882,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   // Rating
                   Row(
                     children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
+                      const Icon(Icons.star_rounded,
+                          color: Colors.amber, size: 20),
                       const SizedBox(width: 4),
                       Text(
                         product!.rating.toString(),
@@ -535,42 +894,45 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        '· Rating',
-                        style: TextStyle(color: kTextMuted, fontSize: 14),
-                      ),
+                      const Text('· Rating',
+                          style: TextStyle(
+                              color: kTextMuted, fontSize: 14)),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // Price
-                  Text(
-                    '₹${product!.price.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: kTextDark,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
+                  // Price — animates when variation changes
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Text(
+                      '₹${_displayPrice.toStringAsFixed(2)}',
+                      key: ValueKey(_displayPrice),
+                      style: const TextStyle(
+                        color: kTextDark,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
 
-                  // Stock
+                  // Stock — animates when variation changes
                   Row(
                     children: [
                       Icon(
-                        product!.isInStock
+                        _displayInStock
                             ? Icons.check_circle
                             : Icons.cancel_outlined,
-                        color: product!.isInStock
+                        color: _displayInStock
                             ? const Color(0xFF1DB954)
                             : kBrandRed,
                         size: 18,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        product!.isInStock
-                            ? 'In Stock (${product!.stock} units)'
+                        _displayInStock
+                            ? 'In Stock (${_displayStock} units)'
                             : 'Out of Stock',
                         style: const TextStyle(
                           color: kTextMuted,
@@ -581,6 +943,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ],
                   ),
                   const SizedBox(height: 28),
+
+                  // ── Variation Selector ────────────────────────────
+                  _buildVariationSelector(),
 
                   const Divider(color: kBorder, height: 1),
                   const SizedBox(height: 20),
@@ -605,12 +970,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Add to Cart button
+                  // ── Add to Cart button ────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton.icon(
-                      onPressed: product!.isInStock ? _addToCart : null,
+                      onPressed: canAddToCart ? _addToCart : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kBrandRed,
                         foregroundColor: Colors.white,
@@ -621,13 +986,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         disabledBackgroundColor: kBorder,
                         disabledForegroundColor: kTextMuted,
                       ),
-                      icon: const Icon(Icons.shopping_cart_outlined, size: 20),
+                      icon: Icon(
+                        hasVariations &&
+                                selectedVariation == null &&
+                                _displayInStock
+                            ? Icons.touch_app_outlined
+                            : Icons.shopping_cart_outlined,
+                        size: 20,
+                      ),
                       label: Text(
-                        product!.isInStock
-                            ? isAddingToCart
-                                  ? 'Adding...'
-                                  : 'Add to Cart'
-                            : 'Out of Stock',
+                        cartButtonLabel,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -639,9 +1007,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   const SizedBox(height: 16),
                 ],
               ),
-            ), // ← Padding closes here
-            // ── Related products (sibling in outer Column) ────────────
-            _buildRelatedProducts(), // ← correct placement
+            ),
+
+            // ── Related products ──────────────────────────────────────
+            _buildRelatedProducts(),
           ],
         ),
       ),
