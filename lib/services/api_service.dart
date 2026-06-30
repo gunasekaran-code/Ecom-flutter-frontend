@@ -181,6 +181,12 @@ class ApiService {
     return const <dynamic>[];
   }
 
+  static List<dynamic> _cartListFromDecoded(dynamic decoded) =>
+      _listFromDecoded(decoded, ['data', 'cart', 'items', 'cart_items']);
+
+  static List<dynamic> _wishlistListFromDecoded(dynamic decoded) =>
+      _listFromDecoded(decoded, ['data', 'wishlist', 'items', 'products']);
+
   static Future<http.Response> _postJson(
     String path,
     Map<String, dynamic> body, {
@@ -522,11 +528,11 @@ class ApiService {
     int quantity = 1,
   }) async {
     try {
-      final response = await _postJson('/cart/add/', {
+      final response = await _postJson('/user/cart/add', {
         'user_id': userId,
         'product_id': productId,
         'quantity': quantity,
-      });
+      }, authenticated: true);
       return _isSuccessStatus(response.statusCode);
     } catch (e) {
       _logError('Error adding to cart: $e');
@@ -536,8 +542,10 @@ class ApiService {
 
   static Future<List<dynamic>> getCart(int userId) async {
     try {
-      final response = await _getJson('/cart/$userId/');
-      if (response.statusCode == 200) return jsonDecode(response.body);
+      final response = await _getJson('/user/cart');
+      if (response.statusCode == 200) {
+        return _cartListFromDecoded(_decodeBody(response));
+      }
     } catch (e) {
       _logError('Error fetching cart: $e');
     }
@@ -550,11 +558,11 @@ class ApiService {
     required int quantity,
   }) async {
     try {
-      final response = await _postJson('/cart/update/', {
+      final response = await _postJson('/user/cart/update', {
         'user_id': userId,
         'product_id': productId,
         'quantity': quantity,
-      });
+      }, authenticated: true);
       return _isSuccessStatus(response.statusCode);
     } catch (e) {
       _logError('Error updating cart item: $e');
@@ -562,21 +570,66 @@ class ApiService {
     }
   }
 
+  static Future<http.Response> _deleteJson(
+    String path, {
+    bool authenticated = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
+
+    final headers = authenticated ? await _authHeaders() : _jsonHeaders;
+
+    _log('DELETE $uri');
+
+    return http.delete(uri, headers: headers).timeout(_requestTimeout);
+  }
+
   static Future<bool> removeFromCart({
     required int userId,
     required int productId,
   }) async {
     try {
-      final response = await _postJson('/cart/remove/', {
-        'user_id': userId,
-        'product_id': productId,
-      });
-      return _isSuccessStatus(response.statusCode);
+      final body = {'user_id': userId, 'product_id': productId};
+
+      final attempts = [
+        () => _deleteJson('/user/cart/remove/$productId/', authenticated: true),
+        () => _postJson('/cart/remove/', body),
+        () => _postJson('/cart/remove', body),
+        () => _deleteJson('/cart/remove/$productId/'),
+        () => _deleteJson('/cart/remove/$productId'),
+      ];
+
+      for (final attempt in attempts) {
+        final response = await attempt();
+        if (_isSuccessStatus(response.statusCode)) {
+          return true;
+        }
+        if (response.statusCode != 404 && response.statusCode != 405) {
+          return false;
+        }
+      }
+
+      return false;
     } catch (e) {
       _logError('Error removing from cart: $e');
       return false;
     }
   }
+
+  // static Future<bool> removeFromCart({
+  //   required int userId,
+  //   required int productId,
+  // }) async {
+  //   try {
+  //     final response = await _postJson('user/cart/remove/{$id}', {
+  //       'user_id': userId,
+  //       'product_id': productId,
+  //     }, authenticated: true);
+  //     return _isSuccessStatus(response.statusCode);
+  //   } catch (e) {
+  //     _logError('Error removing from cart: $e');
+  //     return false;
+  //   }
+  // }
 
   static Future<int> getCartCount(int userId) async {
     final cart = await getCart(userId);
@@ -602,14 +655,92 @@ class ApiService {
         body['shipping_address'] = shippingAddress;
       }
       _log('Checkout body: ${jsonEncode(body)}');
-      final response = await _postJson('/cart/checkout/', body);
-      final data = jsonDecode(response.body);
+      final response = await _postJson(
+        '/user/orders/place',
+        body,
+        authenticated: true,
+      );
+      final data = _decodeBody(response);
       if (_isSuccessStatus(response.statusCode)) {
         return {'success': true, 'data': data};
       }
-      return {'success': false, 'error': data['error'] ?? 'Checkout failed.'};
+      return {
+        'success': false,
+        'error': _errorMessage(data, 'Checkout failed.'),
+      };
     } catch (e) {
       _logError('Checkout exception: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> placeOrder({
+    required int userId,
+    required List<Map<String, dynamic>> items,
+    required String paymentMethod,
+    required double totalAmount,
+    Map<String, dynamic>? shippingAddress,
+    int? addressId,
+  }) {
+    return checkoutCart(
+      userId: userId,
+      productIds: items
+          .map<int?>((item) => int.tryParse(item['product_id'].toString()))
+          .whereType<int>()
+          .toList(),
+      addressId: addressId,
+      shippingAddress: shippingAddress,
+      paymentMethod: paymentMethod,
+    );
+  }
+
+  static Future<Map<String, dynamic>> createRazorpayOrder({
+    required double amount,
+    String currency = 'INR',
+    Map<String, dynamic>? notes,
+  }) async {
+    try {
+      final response = await _postJson('/razorpay/create-order', {
+        'amount': amount,
+        'currency': currency,
+        if (notes != null) 'notes': notes,
+      }, authenticated: true);
+      final data = _decodeBody(response);
+      return _isSuccessStatus(response.statusCode)
+          ? {'success': true, 'data': data}
+          : {
+              'success': false,
+              'error': _errorMessage(data, 'Could not create Razorpay order.'),
+            };
+    } catch (e) {
+      _logError('Razorpay create-order exception: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> verifyRazorpayOrder({
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    try {
+      final response = await _postJson('/razorpay/verify-order', {
+        'razorpay_order_id': razorpayOrderId,
+        'razorpay_payment_id': razorpayPaymentId,
+        'razorpay_signature': razorpaySignature,
+      }, authenticated: true);
+      final data = _decodeBody(response);
+      return _isSuccessStatus(response.statusCode)
+          ? {'success': true, 'data': data}
+          : {
+              'success': false,
+              'error': _errorMessage(
+                data,
+                'Could not verify Razorpay payment.',
+              ),
+            };
+    } catch (e) {
+      _logError('Razorpay verify-order exception: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -620,8 +751,10 @@ class ApiService {
 
   static Future<List<dynamic>> getWishlist(int userId) async {
     try {
-      final response = await _getJson('/wishlist/$userId/');
-      if (response.statusCode == 200) return jsonDecode(response.body);
+      final response = await _getJson('/user/wishlist');
+      if (response.statusCode == 200) {
+        return _wishlistListFromDecoded(_decodeBody(response));
+      }
     } catch (e) {
       _logError('Error fetching wishlist: $e');
     }
@@ -633,10 +766,10 @@ class ApiService {
     required int productId,
   }) async {
     try {
-      final response = await _postJson('/wishlist/add/', {
+      final response = await _postJson('/user/wishlist/add', {
         'user_id': userId,
         'product_id': productId,
-      });
+      }, authenticated: true);
       return _isSuccessStatus(response.statusCode);
     } catch (e) {
       _logError('Error adding to wishlist: $e');
@@ -649,10 +782,10 @@ class ApiService {
     required int productId,
   }) async {
     try {
-      final response = await _postJson('/wishlist/remove/', {
+      final response = await _postJson('/user/wishlist/add', {
         'user_id': userId,
         'product_id': productId,
-      });
+      }, authenticated: true);
       return _isSuccessStatus(response.statusCode);
     } catch (e) {
       _logError('Error removing from wishlist: $e');

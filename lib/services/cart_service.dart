@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/utils/product_data.dart';
 
 class CartService {
@@ -57,6 +58,22 @@ class CartService {
     );
   }
 
+  Future<bool> addProduct({
+    required int userId,
+    required Map<String, dynamic> product,
+    int quantity = 1,
+  }) async {
+    final ok = await ApiService.addToCart(
+      userId: userId,
+      productId: ProductData.id(product),
+      quantity: quantity,
+    );
+    if (ok) {
+      addLocalProduct(product, quantity: quantity);
+    }
+    return ok;
+  }
+
   void updateLocalQuantity(int productId, int quantity) {
     final item = _localCartItems[productId];
     if (item == null) {
@@ -69,9 +86,39 @@ class CartService {
     );
   }
 
+  Future<bool> updateQuantity({
+    required int userId,
+    required int productId,
+    required int quantity,
+  }) async {
+    final ok = await ApiService.updateCartItem(
+      userId: userId,
+      productId: productId,
+      quantity: quantity,
+    );
+    if (ok) {
+      updateLocalQuantity(productId, quantity);
+    }
+    return ok;
+  }
+
   void removeLocalProduct(int productId) {
     _localCartItems.remove(productId);
     notifyCartChange(CartChangeEvent(productId: productId, isAdded: false));
+  }
+
+  Future<bool> removeProduct({
+    required int userId,
+    required int productId,
+  }) async {
+    final ok = await ApiService.removeFromCart(
+      userId: userId,
+      productId: productId,
+    );
+    if (ok) {
+      removeLocalProduct(productId);
+    }
+    return ok;
   }
 
   void removeLocalProducts(Iterable<int> productIds) {

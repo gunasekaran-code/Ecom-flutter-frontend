@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/services/order_service.dart';
 import 'package:wss_sports/pages/payment_success_page.dart';
@@ -104,19 +105,39 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Future<void> _submitOrderToBackend() async {
     setState(() => _isPlacingOrder = true);
 
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    final order = OrderService().createOrder(
+    final result = await ApiService.placeOrder(
       userId: widget.userId,
       items: widget.selectedItems,
       paymentMethod: _paymentMethod,
       totalAmount: total,
-      totalItems: _itemsCount,
-      address: _selectedAddress,
+      addressId: _selectedAddressId,
+      shippingAddress: _selectedAddress,
     );
 
     if (!mounted) return;
     setState(() => _isPlacingOrder = false);
+
+    if (result['success'] != true) {
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: result['error']?.toString() ?? 'Could not place order',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
+    final orderData = result['data'];
+    final order = orderData is Map<String, dynamic>
+        ? Map<String, dynamic>.from(orderData['order'] ?? orderData)
+        : OrderService().createOrder(
+            userId: widget.userId,
+            items: widget.selectedItems,
+            paymentMethod: _paymentMethod,
+            totalAmount: total,
+            totalItems: _itemsCount,
+            address: _selectedAddress,
+          );
 
     CartService().removeLocalProducts(
       widget.selectedItems
@@ -497,7 +518,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               child: Image.network(
                 item['image'],
                 fit: BoxFit.cover,
-                webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
+                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                 errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.image_outlined, color: Colors.grey),
               ),

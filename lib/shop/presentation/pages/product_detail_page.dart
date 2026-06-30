@@ -159,8 +159,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final currentProduct = product;
     if (currentProduct == null || isAddingToCart) return;
     setState(() => isAddingToCart = true);
-    CartService().addLocalProduct(currentProduct);
+    final added = await CartService().addProduct(
+      userId: widget.userData['id'],
+      product: currentProduct,
+    );
     if (!mounted) return;
+    if (!added) {
+      setState(() => isAddingToCart = false);
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: 'Could not add this item to cart',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
     showAppSnackBar(
       context,
       title: 'Success',

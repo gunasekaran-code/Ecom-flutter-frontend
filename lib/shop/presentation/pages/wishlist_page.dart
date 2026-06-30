@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/services/wishlist_service.dart';
 import 'package:wss_sports/shop/presentation/pages/home_page.dart';
@@ -50,6 +51,16 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Future<void> _loadWishlist() async {
+    final serverItems = await ApiService.getWishlist(widget.userData['id']);
+    if (!mounted) return;
+    if (serverItems.isNotEmpty) {
+      setState(() {
+        wishlistItems = serverItems.map(_normalizeWishlistItem).toList();
+        isLoading = false;
+      });
+      return;
+    }
+
     final localItems = WishlistService().localWishlistProducts
         .map((product) => ProductData.toWishlistItem(product))
         .toList();
@@ -60,8 +71,40 @@ class _WishlistPageState extends State<WishlistPage> {
     });
   }
 
+  Map<String, dynamic> _normalizeWishlistItem(dynamic item) {
+    final data = item is Map<String, dynamic>
+        ? Map<String, dynamic>.from(item)
+        : <String, dynamic>{};
+    final product = data['product'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(data['product'])
+        : data;
+    final wishlistItem = ProductData.toWishlistItem(product);
+    wishlistItem['product_id'] =
+        int.tryParse(
+          (data['product_id'] ?? product['id'] ?? product['product_id'] ?? 0)
+              .toString(),
+        ) ??
+        wishlistItem['product_id'];
+    return wishlistItem;
+  }
+
   Future<void> _removeFromWishlist(int productId) async {
-    WishlistService().removeLocalProduct(productId);
+    final removed = await WishlistService().removeProduct(
+      userId: widget.userData['id'],
+      productId: productId,
+    );
+    if (!removed) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          title: 'Error',
+          message: 'Could not remove from wishlist',
+          type: AppSnackBarType.error,
+          duration: const Duration(seconds: 1),
+        );
+      }
+      return;
+    }
     setState(() {
       wishlistItems.removeWhere((item) => item['product_id'] == productId);
     });
@@ -85,9 +128,18 @@ class _WishlistPageState extends State<WishlistPage> {
         throw 'This product is currently out of stock.';
       }
 
-      CartService().addLocalProduct(product);
+      final added = await CartService().addProduct(
+        userId: widget.userData['id'],
+        product: product,
+      );
+      if (!added) {
+        throw 'Could not move this item to cart.';
+      }
 
-      const removed = true;
+      final removed = await WishlistService().removeProduct(
+        userId: widget.userData['id'],
+        productId: productId,
+      );
 
       if (removed) {
         setState(() {
@@ -365,7 +417,7 @@ class WishlistItemCard extends StatelessWidget {
                         width: 110,
                         height: 140,
                         fit: BoxFit.cover,
-                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                         errorBuilder: (_, __, ___) =>
                             _imageFallback(icon: Icons.image_not_supported),
                       )

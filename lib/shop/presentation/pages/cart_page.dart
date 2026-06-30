@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/shop/presentation/pages/checkout_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/utils/product_data.dart';
 
 class CartPage extends StatefulWidget {
   final int userId;
@@ -32,7 +34,38 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> loadCart() async {
+    final serverItems = await ApiService.getCart(widget.userId);
+    if (!mounted) return;
+    if (serverItems.isNotEmpty) {
+      _applyCartItems(serverItems.map(_normalizeCartItem).toList());
+      return;
+    }
     _applyCartItems(CartService().localCartItems);
+  }
+
+  Map<String, dynamic> _normalizeCartItem(dynamic item) {
+    final data = item is Map<String, dynamic>
+        ? Map<String, dynamic>.from(item)
+        : <String, dynamic>{};
+    final product = data['product'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(data['product'])
+        : data;
+    final cartItem = ProductData.toCartItem(
+      product,
+      quantity:
+          int.tryParse(
+            (data['quantity'] ?? data['qty'] ?? product['quantity'] ?? 1)
+                .toString(),
+          ) ??
+          1,
+    );
+    cartItem['product_id'] =
+        int.tryParse(
+          (data['product_id'] ?? product['id'] ?? product['product_id'] ?? 0)
+              .toString(),
+        ) ??
+        cartItem['product_id'];
+    return cartItem;
   }
 
   void _applyCartItems(List items) {
@@ -173,11 +206,28 @@ class _CartPageState extends State<CartPage> {
       return;
     }
 
+    final previousQuantity = currentQuantity;
     setState(() {
       cartItems[index]['quantity'] = newQuantity;
     });
 
-    CartService().updateLocalQuantity(productId, newQuantity);
+    final ok = await CartService().updateQuantity(
+      userId: widget.userId,
+      productId: productId,
+      quantity: newQuantity,
+    );
+    if (!ok && mounted) {
+      setState(() {
+        cartItems[index]['quantity'] = previousQuantity;
+      });
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: 'Could not update cart',
+        type: AppSnackBarType.error,
+        duration: const Duration(seconds: 1),
+      );
+    }
   }
 
   Future<void> proceedToCheckout() async {
@@ -208,12 +258,31 @@ class _CartPageState extends State<CartPage> {
   void removeItem(int index) async {
     final productId = cartItems[index]['product_id'];
     final productName = cartItems[index]['product_name'];
+    final removedItem = Map<String, dynamic>.from(cartItems[index]);
     setState(() {
       cartItems.removeAt(index);
       selectedProductIds.remove(productId);
     });
 
-    CartService().removeLocalProduct(productId);
+    final ok = await CartService().removeProduct(
+      userId: widget.userId,
+      productId: productId,
+    );
+    if (!ok) {
+      setState(() {
+        cartItems.insert(index, removedItem);
+      });
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          title: 'Error',
+          message: 'Could not remove item from cart',
+          type: AppSnackBarType.error,
+          duration: const Duration(seconds: 1),
+        );
+      }
+      return;
+    }
     if (mounted) {
       showAppSnackBar(
         context,
@@ -395,7 +464,8 @@ class _CartPageState extends State<CartPage> {
                                   child: Image.network(
                                     item['image'],
                                     fit: BoxFit.cover,
-                                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
+                                    webHtmlElementStrategy:
+                                        WebHtmlElementStrategy.prefer,
                                     errorBuilder: (_, _, _) => const Icon(
                                       Icons.image,
                                       color: Colors.grey,

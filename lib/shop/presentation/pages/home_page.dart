@@ -654,8 +654,23 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   Future<void> _toggleWishlist() async {
+    final productId = ProductData.id(widget.product);
     if (_isInWishlist) {
-      WishlistService().removeLocalProduct(ProductData.id(widget.product));
+      final removed = await WishlistService().removeProduct(
+        userId: widget.userData['id'],
+        productId: productId,
+      );
+      if (!mounted) return;
+      if (!removed) {
+        showAppSnackBar(
+          context,
+          title: 'Error',
+          message: 'Could not remove from wishlist',
+          type: AppSnackBarType.error,
+          duration: const Duration(seconds: 1),
+        );
+        return;
+      }
       setState(() => _isInWishlist = false);
       if (mounted) {
         showAppSnackBar(
@@ -670,7 +685,21 @@ class _ProductCardState extends State<ProductCard> {
       return;
     }
 
-    WishlistService().addLocalProduct(widget.product);
+    final added = await WishlistService().toggleProduct(
+      userId: widget.userData['id'],
+      product: widget.product,
+    );
+    if (!mounted) return;
+    if (!added) {
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: 'Could not add to wishlist',
+        type: AppSnackBarType.error,
+        duration: const Duration(seconds: 1),
+      );
+      return;
+    }
     setState(() => _isInWishlist = true);
     if (mounted) {
       showAppSnackBar(

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/utils/product_data.dart';
 
 class WishlistService {
@@ -35,11 +36,44 @@ class WishlistService {
     );
   }
 
+  Future<bool> toggleProduct({
+    required int userId,
+    required Map<String, dynamic> product,
+  }) async {
+    final productId = ProductData.id(product);
+    final ok = await ApiService.addToWishlist(
+      userId: userId,
+      productId: productId,
+    );
+    if (!ok) return false;
+
+    if (isInLocalWishlist(productId)) {
+      removeLocalProduct(productId);
+    } else {
+      addLocalProduct(product);
+    }
+    return true;
+  }
+
   void removeLocalProduct(int productId) {
     _localWishlistProducts.remove(productId);
     notifyWishlistChange(
       WishlistChangeEvent(productId: productId, isAdded: false),
     );
+  }
+
+  Future<bool> removeProduct({
+    required int userId,
+    required int productId,
+  }) async {
+    final ok = await ApiService.removeFromWishlist(
+      userId: userId,
+      productId: productId,
+    );
+    if (ok) {
+      removeLocalProduct(productId);
+    }
+    return ok;
   }
 
   void notifyWishlistChange(WishlistChangeEvent event) {
