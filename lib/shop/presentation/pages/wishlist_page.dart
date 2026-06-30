@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:wss_sports/models/product_model.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/services/wishlist_service.dart';
 import 'package:wss_sports/shop/presentation/pages/home_page.dart';
 import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
 import 'package:wss_sports/shop/presentation/pages/product_detail_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/utils/product_data.dart';
 
 class WishlistPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -51,7 +51,7 @@ class _WishlistPageState extends State<WishlistPage> {
 
   Future<void> _loadWishlist() async {
     final localItems = WishlistService().localWishlistProducts
-        .map((product) => product.toWishlistItem())
+        .map((product) => ProductData.toWishlistItem(product))
         .toList();
 
     setState(() {
@@ -79,25 +79,9 @@ class _WishlistPageState extends State<WishlistPage> {
   Future<void> _moveToCart(Map<String, dynamic> item) async {
     final productId = item['product_id'] as int;
     try {
-      final product = Product(
-        id: productId,
-        name: item['product_name'] ?? 'Product',
-        description: item['description'] ?? '',
-        price: double.tryParse(item['price'].toString()) ?? 0,
-        category: item['category'] ?? 'Unknown',
-        imageUrl: item['image'],
-        images: [
-          if (item['image'] != null && item['image'].toString().isNotEmpty)
-            item['image'].toString(),
-        ],
-        stock: (item['stock'] as num?)?.toInt() ?? 1,
-        rating: double.tryParse(item['rating'].toString()) ?? 0,
-        delFlag: false,
-        isInStock: item['is_in_stock'] ?? true,
-        createdAt: DateTime.now().toIso8601String(),
-      );
+      final product = _productFromWishlistItem(item) ?? item;
 
-      if (!product.isInStock || product.stock < 1) {
+      if (!ProductData.isInStock(product) || ProductData.stock(product) < 1) {
         throw 'This product is currently out of stock.';
       }
 
@@ -154,6 +138,26 @@ class _WishlistPageState extends State<WishlistPage> {
         );
       }
     }
+  }
+
+  Map<String, dynamic>? _productFromWishlistItem(Map<String, dynamic> item) {
+    final rawProduct = item['raw_product'];
+    if (rawProduct is Map<String, dynamic>) {
+      return rawProduct;
+    }
+
+    final productId = item['product_id'];
+    if (productId is! int) {
+      return null;
+    }
+
+    for (final product in WishlistService().localWishlistProducts) {
+      if (ProductData.id(product) == productId) {
+        return product;
+      }
+    }
+
+    return null;
   }
 
   @override
@@ -550,14 +554,14 @@ class WishlistItemCard extends StatelessWidget {
     );
   }
 
-  Product? _productFromWishlistItem(Map<String, dynamic> item) {
+  Map<String, dynamic>? _productFromWishlistItem(Map<String, dynamic> item) {
     final productId = item['product_id'];
     if (productId is! int) {
       return null;
     }
 
     for (final product in WishlistService().localWishlistProducts) {
-      if (product.id == productId) {
+      if (ProductData.id(product) == productId) {
         return product;
       }
     }

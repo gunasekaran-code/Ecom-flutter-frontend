@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:wss_sports/models/product_model.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/utils/product_data.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final int productId;
-  final Product? initialProduct;
+  final Map<String, dynamic>? initialProduct;
   final Map<String, dynamic> userData;
 
   const ProductDetailPage({
@@ -21,30 +22,33 @@ class ProductDetailPage extends StatefulWidget {
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
-  Product? product;
+  Map<String, dynamic>? product;
+  List<Map<String, dynamic>> relatedProducts = [];
   bool isLoading = true;
   bool isAddingToCart = false;
   int currentImageIndex = 0;
   late PageController pageController;
 
-  ProductVariation? selectedVariation;
+  Map<String, dynamic>? selectedVariation;
 
   // ── Live price / stock / availability ─────────────────────────────
-  double get _displayPrice => selectedVariation?.price ?? product!.price;
-  int get _displayStock => selectedVariation?.stock ?? product!.stock;
+  double get _displayPrice =>
+      _variationPrice(selectedVariation) ?? ProductData.price(product!);
+  int get _displayStock => selectedVariation == null
+      ? ProductData.stock(product!)
+      : _variationStock(selectedVariation!);
   bool get _displayInStock => selectedVariation != null
-      ? selectedVariation!.isAvailable && selectedVariation!.stock > 0
-      : product!.isInStock;
+      ? _variationIsAvailable(selectedVariation!) &&
+            _variationStock(selectedVariation!) > 0
+      : ProductData.isInStock(product!);
 
   // ── Image list: prepends the variation image when one is selected ──
   // This drives the carousel so it jumps to the variation's image.
   List<String> get _displayImages {
     if (product == null) return [];
-    final base = product!.images.isNotEmpty
-        ? product!.images
-        : [if (product!.imageUrl != null) product!.imageUrl!];
+    final base = ProductData.images(product!);
 
-    final varImage = selectedVariation?.image;
+    final varImage = _variationImage(selectedVariation);
     if (varImage != null && !base.contains(varImage)) {
       return [varImage, ...base];
     }
@@ -52,10 +56,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   // ── Related products ───────────────────────────────────────────────
-  List<Product> get _relatedProducts {
+  List<Map<String, dynamic>> get _relatedProducts {
     if (product == null) return [];
-    return staticProducts
-        .where((p) => p.category == product!.category && p.id != product!.id)
+    return relatedProducts
+        .where(
+          (p) =>
+              ProductData.category(p) == ProductData.category(product!) &&
+              ProductData.id(p) != ProductData.id(product!),
+        )
         .toList();
   }
 
@@ -75,25 +83,65 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Future<void> fetchData() async {
     if (widget.initialProduct != null) {
+      await _fetchRelatedProducts();
+      if (!mounted) return;
       setState(() => isLoading = false);
       return;
     }
-    Product? localProduct;
-    for (final item in staticProducts) {
-      if (item.id == widget.productId) {
-        localProduct = item;
-        break;
-      }
-    }
+    final productDetail = await ApiService.getProductDetail(widget.productId);
+    await _fetchRelatedProducts();
+    if (!mounted) return;
     setState(() {
-      product = localProduct;
+      product = productDetail;
       isLoading = false;
     });
   }
 
+  Future<void> _fetchRelatedProducts() async {
+    relatedProducts = await ApiService.getProducts();
+  }
+
+  int _variationId(Map<String, dynamic> variation) =>
+      int.tryParse(variation['id']?.toString() ?? '') ?? 0;
+
+  String _variationType(Map<String, dynamic> variation) =>
+      variation['type']?.toString() ??
+      variation['variation_type']?.toString() ??
+      'option';
+
+  String _variationLabel(Map<String, dynamic> variation) =>
+      variation['label']?.toString() ??
+      variation['name']?.toString() ??
+      variation['value']?.toString() ??
+      '';
+
+  double? _variationPrice(Map<String, dynamic>? variation) {
+    if (variation == null) return null;
+    return double.tryParse(variation['price']?.toString() ?? '');
+  }
+
+  int _variationStock(Map<String, dynamic> variation) =>
+      int.tryParse(variation['stock']?.toString() ?? '') ?? 0;
+
+  bool _variationIsAvailable(Map<String, dynamic> variation) {
+    final value = variation['is_available'];
+    if (value is bool) return value;
+    return _variationStock(variation) > 0;
+  }
+
+  String? _variationColorHex(Map<String, dynamic> variation) =>
+      variation['color_hex']?.toString();
+
+  String? _variationImage(Map<String, dynamic>? variation) {
+    if (variation == null) return null;
+    final image =
+        variation['image']?.toString() ?? variation['image_url']?.toString();
+    return image == null || image.isEmpty ? null : image;
+  }
+
   // ── Select / deselect a variation ─────────────────────────────────
   // Also resets the image carousel to page 0 so the variation image is visible.
-  void _selectVariation(ProductVariation? v) {
+  void _selectVariation(Map<String, dynamic>? v) {
     setState(() {
       selectedVariation = v;
       currentImageIndex = 0;
@@ -154,13 +202,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   /// Color swatch chip — circle filled with [v.colorHex], check when selected,
   /// ✕ overlay when unavailable.
   Widget _buildColorChip(
-      ProductVariation v, bool isSelected, bool isUnavailable) {
-    final color = v.colorHex != null
-        ? Color(int.parse(v.colorHex!.replaceFirst('#', '0xFF')))
+    Map<String, dynamic> v,
+    bool isSelected,
+    bool isUnavailable,
+  ) {
+    final colorHex = _variationColorHex(v);
+    final color = colorHex != null
+        ? Color(int.parse(colorHex.replaceFirst('#', '0xFF')))
         : Colors.grey.shade400;
 
     return GestureDetector(
-      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      onTap: isUnavailable
+          ? null
+          : () => _selectVariation(isSelected ? null : v),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -190,25 +244,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ],
             ),
             child: isUnavailable
-                ? const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 18)
+                ? const Icon(Icons.close_rounded, color: Colors.white, size: 18)
                 : (isSelected
-                    ? const Icon(Icons.check_rounded,
-                        color: Colors.white, size: 18)
-                    : null),
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        )
+                      : null),
           ),
           const SizedBox(height: 5),
           Text(
-            v.label,
+            _variationLabel(v),
             style: TextStyle(
               color: isUnavailable
                   ? kTextMuted.withOpacity(0.4)
                   : (isSelected ? kBrandRed : kTextDark),
               fontSize: 11,
-              fontWeight:
-                  isSelected ? FontWeight.w700 : FontWeight.w500,
-              decoration:
-                  isUnavailable ? TextDecoration.lineThrough : null,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              decoration: isUnavailable ? TextDecoration.lineThrough : null,
             ),
           ),
         ],
@@ -219,9 +273,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   /// Image-thumbnail chip — shows a small preview of [v.image] above the label.
   /// Used when a variation carries its own image (e.g. a colour-way or style).
   Widget _buildImageChip(
-      ProductVariation v, bool isSelected, bool isUnavailable) {
+    Map<String, dynamic> v,
+    bool isSelected,
+    bool isUnavailable,
+  ) {
+    final image = _variationImage(v);
     return GestureDetector(
-      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      onTap: isUnavailable
+          ? null
+          : () => _selectVariation(isSelected ? null : v),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: 72,
@@ -247,10 +307,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           children: [
             // Thumbnail image
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(11)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(11),
+              ),
               child: Image.network(
-                v.image!,
+                image!,
                 width: 72,
                 height: 64,
                 fit: BoxFit.cover,
@@ -273,23 +334,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected ? kBrandRed : Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(11)),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(11),
+                ),
               ),
               child: Text(
-                v.label,
+                _variationLabel(v),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isSelected
                       ? Colors.white
                       : (isUnavailable
-                          ? kTextMuted.withOpacity(0.4)
-                          : kTextDark),
+                            ? kTextMuted.withOpacity(0.4)
+                            : kTextDark),
                   fontSize: 11,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w500,
-                  decoration:
-                      isUnavailable ? TextDecoration.lineThrough : null,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  decoration: isUnavailable ? TextDecoration.lineThrough : null,
                 ),
               ),
             ),
@@ -301,19 +361,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   /// Plain text chip — the default for size, length, capacity, dpi, material.
   Widget _buildTextChip(
-      ProductVariation v, bool isSelected, bool isUnavailable) {
+    Map<String, dynamic> v,
+    bool isSelected,
+    bool isUnavailable,
+  ) {
     return GestureDetector(
-      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      onTap: isUnavailable
+          ? null
+          : () => _selectVariation(isSelected ? null : v),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected
               ? kBrandRed
-              : (isUnavailable
-                  ? kBorder.withOpacity(0.3)
-                  : Colors.white),
+              : (isUnavailable ? kBorder.withOpacity(0.3) : Colors.white),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? kBrandRed : kBorder,
@@ -330,18 +392,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               : [],
         ),
         child: Text(
-          v.label,
+          _variationLabel(v),
           style: TextStyle(
             color: isSelected
                 ? Colors.white
-                : (isUnavailable
-                    ? kTextMuted.withOpacity(0.4)
-                    : kTextDark),
+                : (isUnavailable ? kTextMuted.withOpacity(0.4) : kTextDark),
             fontSize: 13,
-            fontWeight:
-                isSelected ? FontWeight.w700 : FontWeight.w500,
-            decoration:
-                isUnavailable ? TextDecoration.lineThrough : null,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            decoration: isUnavailable ? TextDecoration.lineThrough : null,
           ),
         ),
       ),
@@ -353,14 +411,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   // ─────────────────────────────────────────────────────────────────
 
   Widget _buildVariationSelector() {
-    if (product == null || product!.variations.isEmpty) {
+    final variations = ProductData.variations(product ?? {});
+    if (product == null || variations.isEmpty) {
       return const SizedBox.shrink();
     }
 
     // Group by type preserving insertion order
-    final Map<String, List<ProductVariation>> grouped = {};
-    for (final v in product!.variations) {
-      grouped.putIfAbsent(v.type, () => []).add(v);
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final v in variations) {
+      grouped.putIfAbsent(_variationType(v), () => []).add(v);
     }
 
     return Column(
@@ -372,8 +431,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ...grouped.entries.map((entry) {
           final type = entry.key;
           final options = entry.value;
-          final displayLabel =
-              type[0].toUpperCase() + type.substring(1);
+          final displayLabel = type[0].toUpperCase() + type.substring(1);
           final isColorType = type == 'color';
 
           return Column(
@@ -392,10 +450,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   // Show selected value inline, e.g. "Size — XL"
                   if (selectedVariation != null &&
-                      selectedVariation!.type == type) ...[
+                      _variationType(selectedVariation!) == type) ...[
                     const SizedBox(width: 8),
                     Text(
-                      '— ${selectedVariation!.label}',
+                      '- ${_variationLabel(selectedVariation!)}',
                       style: const TextStyle(
                         color: kBrandRed,
                         fontSize: 14,
@@ -412,14 +470,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 spacing: isColorType ? 14 : 8,
                 runSpacing: isColorType ? 14 : 8,
                 children: options.map((v) {
-                  final isSelected = selectedVariation?.id == v.id;
+                  final isSelected =
+                      _variationId(selectedVariation ?? {}) == _variationId(v);
                   final isUnavailable =
-                      !v.isAvailable || v.stock == 0;
+                      !_variationIsAvailable(v) || _variationStock(v) == 0;
 
                   if (isColorType) {
                     // Always render color swatches for 'color' type
                     return _buildColorChip(v, isSelected, isUnavailable);
-                  } else if (v.image != null) {
+                  } else if (_variationImage(v) != null) {
                     // Render image-thumbnail chip when variation has its own image
                     return _buildImageChip(v, isSelected, isUnavailable);
                   } else {
@@ -437,25 +496,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         if (selectedVariation != null)
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: kBrandRed.withOpacity(0.06),
               borderRadius: BorderRadius.circular(10),
-              border:
-                  Border.all(color: kBrandRed.withOpacity(0.15)),
+              border: Border.all(color: kBrandRed.withOpacity(0.15)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline,
-                    color: kBrandRed, size: 16),
+                const Icon(Icons.info_outline, color: kBrandRed, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    selectedVariation!.image != null
-                        ? 'Preview updated for selected ${selectedVariation!.type}'
-                        : 'Price updated for selected ${selectedVariation!.type}',
+                    _variationImage(selectedVariation!) != null
+                        ? 'Preview updated for selected ${_variationType(selectedVariation!)}'
+                        : 'Price updated for selected ${_variationType(selectedVariation!)}',
                     style: const TextStyle(
                       color: kBrandRed,
                       fontSize: 12,
@@ -498,15 +554,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'More in ${product!.category.toUpperCase()}',
-                    style:
-                        const TextStyle(color: kTextMuted, fontSize: 12),
+                    'More in ${ProductData.category(product!).toUpperCase()}',
+                    style: const TextStyle(color: kTextMuted, fontSize: 12),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: kBrandRed.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(8),
@@ -538,7 +595,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProductDetailPage(
-                        productId: p.id,
+                        productId: ProductData.id(p),
                         initialProduct: p,
                         userData: widget.userData,
                       ),
@@ -565,10 +622,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     children: [
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(16)),
-                        child: p.imageUrl != null
+                          top: Radius.circular(16),
+                        ),
+                        child: ProductData.image(p) != null
                             ? Image.network(
-                                p.imageUrl!,
+                                ProductData.image(p)!,
                                 height: 130,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
@@ -576,28 +634,30 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                   height: 130,
                                   color: kBrandRedSoft,
                                   child: const Icon(
-                                      Icons.image_not_supported,
-                                      color: kBrandRed),
+                                    Icons.image_not_supported,
+                                    color: kBrandRed,
+                                  ),
                                 ),
                               )
                             : Container(
                                 height: 130,
                                 color: kBrandRedSoft,
-                                child: const Icon(Icons.shopping_bag,
-                                    color: kBrandRed, size: 32),
+                                child: const Icon(
+                                  Icons.shopping_bag,
+                                  color: kBrandRed,
+                                  size: 32,
+                                ),
                               ),
                       ),
                       Expanded(
                         child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                p.name,
+                                ProductData.name(p),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -612,7 +672,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '₹${p.price.toStringAsFixed(0)}',
+                                    '₹${ProductData.price(p).toStringAsFixed(0)}',
                                     style: const TextStyle(
                                       color: kBrandRed,
                                       fontWeight: FontWeight.w800,
@@ -621,14 +681,18 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                   ),
                                   Row(
                                     children: [
-                                      const Icon(Icons.star_rounded,
-                                          color: Colors.amber, size: 13),
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        color: Colors.amber,
+                                        size: 13,
+                                      ),
                                       const SizedBox(width: 2),
                                       Text(
-                                        p.rating.toString(),
+                                        ProductData.rating(p).toString(),
                                         style: const TextStyle(
-                                            color: kTextMuted,
-                                            fontSize: 11),
+                                          color: kTextMuted,
+                                          fontSize: 11,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -669,8 +733,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         backgroundColor: kBackground,
         appBar: _buildAppBar(),
         body: const Center(
-          child: Text('Product not found',
-              style: TextStyle(color: kTextMuted, fontSize: 16)),
+          child: Text(
+            'Product not found',
+            style: TextStyle(color: kTextMuted, fontSize: 16),
+          ),
         ),
       );
     }
@@ -679,7 +745,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final imageList = _displayImages;
 
     // Cart button logic
-    final bool hasVariations = product!.variations.isNotEmpty;
+    final variations = ProductData.variations(product!);
+    final bool hasVariations = variations.isNotEmpty;
     final bool canAddToCart =
         _displayInStock && (!hasVariations || selectedVariation != null);
 
@@ -687,7 +754,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     if (!_displayInStock) {
       cartButtonLabel = 'Out of Stock';
     } else if (hasVariations && selectedVariation == null) {
-      final firstType = product!.variations.first.type;
+      final firstType = _variationType(variations.first);
       cartButtonLabel =
           'Select ${firstType[0].toUpperCase()}${firstType.substring(1)}';
     } else if (isAddingToCart) {
@@ -703,7 +770,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── Image carousel ────────────────────────────────────────
             if (imageList.isNotEmpty)
               Column(
@@ -727,14 +793,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) =>
                                   Container(
-                                width: double.infinity,
-                                color: kSurface,
-                                child: const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 64,
-                                  color: kTextMuted,
-                                ),
-                              ),
+                                    width: double.infinity,
+                                    color: kSurface,
+                                    child: const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      size: 64,
+                                      color: kTextMuted,
+                                    ),
+                                  ),
                             ),
                           );
                         },
@@ -751,8 +817,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         imageList.length,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
-                          margin:
-                              const EdgeInsets.symmetric(horizontal: 3),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
                           width: currentImageIndex == index ? 18 : 6,
                           height: 6,
                           decoration: BoxDecoration(
@@ -768,8 +833,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
                   // Thumbnail strip
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: SizedBox(
                       height: 72,
                       child: ListView.builder(
@@ -779,38 +843,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           final isSelected = currentImageIndex == index;
                           return Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 4.0),
+                              horizontal: 4.0,
+                            ),
                             child: GestureDetector(
-                              onTap: () =>
-                                  pageController.animateToPage(
+                              onTap: () => pageController.animateToPage(
                                 index,
-                                duration:
-                                    const Duration(milliseconds: 300),
+                                duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
                               ),
                               child: AnimatedContainer(
-                                duration:
-                                    const Duration(milliseconds: 200),
+                                duration: const Duration(milliseconds: 200),
                                 decoration: BoxDecoration(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected
-                                        ? kBrandRed
-                                        : kBorder,
+                                    color: isSelected ? kBrandRed : kBorder,
                                     width: isSelected ? 1.6 : 1,
                                   ),
                                 ),
                                 child: ClipRRect(
-                                  borderRadius:
-                                      BorderRadius.circular(11),
+                                  borderRadius: BorderRadius.circular(11),
                                   child: Image.network(
                                     imageList[index],
                                     width: 68,
                                     height: 68,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        Container(
+                                    errorBuilder: (_, __, ___) => Container(
                                       width: 68,
                                       height: 68,
                                       color: kSurface,
@@ -836,8 +893,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 width: double.infinity,
                 height: 340,
                 color: kSurface,
-                child: const Icon(Icons.shopping_bag_outlined,
-                    size: 80, color: kTextMuted),
+                child: const Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 80,
+                  color: kTextMuted,
+                ),
               ),
 
             // ── Product info ──────────────────────────────────────────
@@ -846,17 +906,18 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   // Category chip
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: kBrandRed.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      product!.category.toUpperCase(),
+                      ProductData.category(product!).toUpperCase(),
                       style: const TextStyle(
                         color: kBrandRed,
                         fontSize: 11,
@@ -869,7 +930,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
                   // Product name
                   Text(
-                    product!.name,
+                    ProductData.name(product!),
                     style: const TextStyle(
                       color: kTextDark,
                       fontSize: 24,
@@ -882,11 +943,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   // Rating
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded,
-                          color: Colors.amber, size: 20),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        product!.rating.toString(),
+                        ProductData.rating(product!).toString(),
                         style: const TextStyle(
                           color: kTextDark,
                           fontSize: 14,
@@ -894,9 +958,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('· Rating',
-                          style: TextStyle(
-                              color: kTextMuted, fontSize: 14)),
+                      const Text(
+                        '· Rating',
+                        style: TextStyle(color: kTextMuted, fontSize: 14),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -961,7 +1026,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    product!.description,
+                    ProductData.description(product!),
                     style: const TextStyle(
                       color: kTextMuted,
                       fontSize: 14.5,

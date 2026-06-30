@@ -1,13 +1,13 @@
 import 'dart:async';
 
-import 'package:wss_sports/models/product_model.dart';
+import 'package:wss_sports/utils/product_data.dart';
 
 class WishlistService {
   static final WishlistService _instance = WishlistService._internal();
 
   final _wishlistChangeController =
       StreamController<WishlistChangeEvent>.broadcast();
-  final Map<int, Product> _localWishlistProducts = {};
+  final Map<int, Map<String, dynamic>> _localWishlistProducts = {};
 
   WishlistService._internal();
 
@@ -18,17 +18,20 @@ class WishlistService {
   Stream<WishlistChangeEvent> get wishlistChangeStream =>
       _wishlistChangeController.stream;
 
-  List<Product> get localWishlistProducts =>
-      _localWishlistProducts.values.toList();
+  List<Map<String, dynamic>> get localWishlistProducts => _localWishlistProducts
+      .values
+      .map((product) => Map<String, dynamic>.from(product))
+      .toList();
 
   bool isInLocalWishlist(int productId) {
     return _localWishlistProducts.containsKey(productId);
   }
 
-  void addLocalProduct(Product product) {
-    _localWishlistProducts[product.id] = product;
+  void addLocalProduct(Map<String, dynamic> product) {
+    final productId = ProductData.id(product);
+    _localWishlistProducts[productId] = Map<String, dynamic>.from(product);
     notifyWishlistChange(
-      WishlistChangeEvent(productId: product.id, isAdded: true),
+      WishlistChangeEvent(productId: productId, isAdded: true),
     );
   }
 

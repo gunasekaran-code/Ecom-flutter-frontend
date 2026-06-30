@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:wss_sports/core/localization/app_strings.dart';
-import 'package:wss_sports/models/product_model.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/wishlist_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/shop/presentation/pages/product_detail_page.dart';
 import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/utils/product_data.dart';
 import 'dart:async';
+
+const List<Map<String, dynamic>> fallbackCategories = [
+  {'id': 0, 'name': 'all', 'display_name': 'All'},
+  {'id': null, 'name': 'weapons', 'display_name': 'Weapons'},
+  {'id': null, 'name': 'sports', 'display_name': 'Uniforms'},
+  {'id': null, 'name': 'accessories', 'display_name': 'Accessories'},
+];
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -17,8 +25,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Product> products = [];
-  List<Product> filteredProducts = [];
+  List<Map<String, dynamic>> products = [];
+  List<Map<String, dynamic>> filteredProducts = [];
   bool isLoading = true;
   String selectedCategory = 'all';
   final TextEditingController _searchController = TextEditingController();
@@ -71,9 +79,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchCategories() async {
-    // Use static category data to show categories immediately.
+    // Keep static categories as a fallback while the API loads.
     setState(() {
-      categories = staticCategories;
+      categories = fallbackCategories;
+    });
+
+    final result = await ApiService.getCategories();
+    if (!mounted || result['success'] != true) return;
+
+    final data = result['data'];
+    final apiCategories = data is List
+        ? data.whereType<Map<String, dynamic>>().toList()
+        : <Map<String, dynamic>>[];
+
+    if (apiCategories.isEmpty) return;
+
+    setState(() {
+      categories = [
+        {'id': 0, 'name': 'all', 'display_name': 'All'},
+        ...apiCategories,
+      ];
     });
   }
 
@@ -110,8 +135,8 @@ class _HomePageState extends State<HomePage> {
     filteredProducts = products.where((product) {
       final matchesSearch =
           _searchQuery.isEmpty ||
-          product.name.toLowerCase().contains(_searchQuery) ||
-          product.description.toLowerCase().contains(_searchQuery);
+          ProductData.name(product).toLowerCase().contains(_searchQuery) ||
+          ProductData.description(product).toLowerCase().contains(_searchQuery);
       return matchesSearch;
     }).toList();
   }
@@ -119,11 +144,13 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchProducts() async {
     setState(() => isLoading = true);
     final categoryFilter = selectedCategory.trim();
-    final fetchedProducts = categoryFilter == 'all' || categoryFilter.isEmpty
-        ? staticProducts
-        : staticProducts
-              .where((product) => product.category == categoryFilter)
-              .toList();
+    final fetchedProducts = await ApiService.getProducts(
+      category: categoryFilter == 'all' || categoryFilter.isEmpty
+          ? null
+          : categoryFilter,
+    );
+
+    if (!mounted) return;
 
     setState(() {
       products = fetchedProducts;
@@ -590,7 +617,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class ProductCard extends StatefulWidget {
-  final Product product;
+  final Map<String, dynamic> product;
   final Map<String, dynamic> userData;
 
   const ProductCard({super.key, required this.product, required this.userData});
@@ -610,7 +637,7 @@ class _ProductCardState extends State<ProductCard> {
     _wishlistSubscription = WishlistService().wishlistChangeStream.listen((
       event,
     ) {
-      if (event.productId == widget.product.id) {
+      if (event.productId == ProductData.id(widget.product)) {
         setState(() {
           _isInWishlist = event.isAdded;
         });
@@ -620,13 +647,15 @@ class _ProductCardState extends State<ProductCard> {
 
   Future<void> _checkWishlistStatus() async {
     setState(() {
-      _isInWishlist = WishlistService().isInLocalWishlist(widget.product.id);
+      _isInWishlist = WishlistService().isInLocalWishlist(
+        ProductData.id(widget.product),
+      );
     });
   }
 
   Future<void> _toggleWishlist() async {
     if (_isInWishlist) {
-      WishlistService().removeLocalProduct(widget.product.id);
+      WishlistService().removeLocalProduct(ProductData.id(widget.product));
       setState(() => _isInWishlist = false);
       if (mounted) {
         showAppSnackBar(
@@ -668,7 +697,7 @@ class _ProductCardState extends State<ProductCard> {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailPage(
-              productId: widget.product.id,
+              productId: ProductData.id(widget.product),
               initialProduct: widget.product,
               userData: widget.userData,
             ),
@@ -697,9 +726,9 @@ class _ProductCardState extends State<ProductCard> {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(18),
                   ),
-                  child: widget.product.imageUrl != null
+                  child: ProductData.image(widget.product) != null
                       ? Image.network(
-                          widget.product.imageUrl!,
+                          ProductData.image(widget.product)!,
                           height: 160,
                           width: double.infinity,
                           fit: BoxFit.cover,
@@ -761,7 +790,7 @@ class _ProductCardState extends State<ProductCard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      widget.product.name,
+                      ProductData.name(widget.product),
                       style: const TextStyle(
                         color: kTextDark,
                         fontWeight: FontWeight.w600,
@@ -774,7 +803,7 @@ class _ProductCardState extends State<ProductCard> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '₹${widget.product.price.toStringAsFixed(2)}',
+                          '₹${ProductData.price(widget.product).toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: kBrandRed,
                             fontWeight: FontWeight.bold,
@@ -790,7 +819,7 @@ class _ProductCardState extends State<ProductCard> {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              widget.product.rating.toString(),
+                              ProductData.rating(widget.product).toString(),
                               style: const TextStyle(
                                 color: kTextMuted,
                                 fontSize: 12,

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:wss_sports/models/product_model.dart';
+import 'package:wss_sports/utils/product_data.dart';
 
 class CartService {
   static final CartService _instance = CartService._internal();
@@ -31,23 +31,28 @@ class CartService {
     return _localCartItems.containsKey(productId);
   }
 
-  void addLocalProduct(Product product, {int quantity = 1}) {
-    final existingItem = _localCartItems[product.id];
+  void addLocalProduct(Map<String, dynamic> product, {int quantity = 1}) {
+    final productId = ProductData.id(product);
+    final existingItem = _localCartItems[productId];
     if (existingItem != null) {
       final currentQuantity = (existingItem['quantity'] as num?)?.toInt() ?? 1;
-      final availableStock = product.stock;
+      final availableStock = ProductData.stock(product);
+      final maxQuantity = availableStock < 1 ? 1 : availableStock;
       existingItem['quantity'] = (currentQuantity + quantity)
-          .clamp(1, availableStock)
+          .clamp(1, maxQuantity)
           .toInt();
     } else {
-      _localCartItems[product.id] = product.toCartItem(quantity: quantity);
+      _localCartItems[productId] = ProductData.toCartItem(
+        product,
+        quantity: quantity,
+      );
     }
 
     notifyCartChange(
       CartChangeEvent(
-        productId: product.id,
+        productId: productId,
         isAdded: true,
-        quantity: _localCartItems[product.id]?['quantity'] ?? quantity,
+        quantity: _localCartItems[productId]?['quantity'] ?? quantity,
       ),
     );
   }
