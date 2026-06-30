@@ -40,6 +40,21 @@ class ProductData {
       double.tryParse(product['amount']?.toString() ?? '') ??
       0;
 
+  static String? assetUrl(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    final cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    if (cleanPath.startsWith('storage/')) {
+      return 'http://192.168.1.15:8000/$cleanPath';
+    }
+    return '$_storageBase$cleanPath';
+  }
+
   static String category(Map<String, dynamic> product) {
     final displayName = product['category_display_name']?.toString() ?? '';
     if (displayName.isNotEmpty) return displayName;
@@ -74,10 +89,7 @@ class ProductData {
       'photo',
       'main_image',
     ]);
-    if (raw == null) return null;
-    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-    final cleanPath = raw.startsWith('/') ? raw.substring(1) : raw;
-    return '$_storageBase$cleanPath';
+    return assetUrl(raw);
   }
 
   static List<String> images(Map<String, dynamic> product) {
@@ -96,6 +108,8 @@ class ProductData {
                       ])
                     : item?.toString(),
               )
+              .whereType<String>()
+              .map(assetUrl)
               .whereType<String>()
               .where((url) => url.isNotEmpty)
               .toList()
@@ -155,7 +169,4 @@ class ProductData {
     'is_in_stock': isInStock(product),
     'raw_product': Map<String, dynamic>.from(product),
   };
-
-  
 }
-

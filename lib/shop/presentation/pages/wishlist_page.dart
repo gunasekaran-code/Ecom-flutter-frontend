@@ -119,10 +119,8 @@ class _WishlistPageState extends State<WishlistPage> {
       }
     } catch (e) {
       if (mounted) {
-        // 2. Clean up the error string so it doesn't say "Error: Exception: ..."
         String errorMessage = e.toString();
 
-        // Remove the "Exception: " prefix if Dart adds it
         if (errorMessage.startsWith('Exception: ')) {
           errorMessage = errorMessage.replaceFirst('Exception: ', '');
         } else if (errorMessage.startsWith('Error: ')) {
@@ -367,6 +365,7 @@ class WishlistItemCard extends StatelessWidget {
                         width: 110,
                         height: 140,
                         fit: BoxFit.cover,
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
                         errorBuilder: (_, __, ___) =>
                             _imageFallback(icon: Icons.image_not_supported),
                       )

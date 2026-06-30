@@ -732,6 +732,7 @@ class _ProductCardState extends State<ProductCard> {
                           height: 160,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                           errorBuilder: (_, _, _) => Container(
                             height: 160,
                             width: double.infinity,

@@ -729,6 +729,7 @@ class _PaymentFailedPageState extends State<PaymentFailedPage>
                             ? Image.network(
                                 item['image'],
                                 fit: BoxFit.cover,
+                                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                                 errorBuilder: (_, __, ___) => const Icon(
                                   Icons.image_outlined,
                                   color: kTextMuted,

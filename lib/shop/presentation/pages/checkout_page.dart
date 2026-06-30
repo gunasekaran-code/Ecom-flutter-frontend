@@ -497,6 +497,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               child: Image.network(
                 item['image'],
                 fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
                 errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.image_outlined, color: Colors.grey),
               ),

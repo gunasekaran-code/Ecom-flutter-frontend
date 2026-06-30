@@ -876,6 +876,7 @@ class _ItemRow extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
                       errorBuilder: (context, error, stackTrace) =>
                           _placeholder(),
                     )

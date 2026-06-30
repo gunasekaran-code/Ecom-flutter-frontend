@@ -136,7 +136,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     if (variation == null) return null;
     final image =
         variation['image']?.toString() ?? variation['image_url']?.toString();
-    return image == null || image.isEmpty ? null : image;
+    return ProductData.assetUrl(image);
   }
 
   // ── Select / deselect a variation ─────────────────────────────────
@@ -315,6 +315,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 width: 72,
                 height: 64,
                 fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                 errorBuilder: (_, __, ___) => Container(
                   width: 72,
                   height: 64,
@@ -630,6 +631,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                 height: 130,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
+                                webHtmlElementStrategy:
+                                    WebHtmlElementStrategy.prefer,
                                 errorBuilder: (_, __, ___) => Container(
                                   height: 130,
                                   color: kBrandRedSoft,
@@ -793,6 +796,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               imageUrl,
                               width: double.infinity,
                               fit: BoxFit.contain,
+                              webHtmlElementStrategy:
+                                  WebHtmlElementStrategy.prefer,
                               errorBuilder: (context, error, stackTrace) {
                                 print('🔴 Image failed: $imageUrl — $error');
                                 return Container(
@@ -871,6 +876,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                     width: 68,
                                     height: 68,
                                     fit: BoxFit.cover,
+                                    webHtmlElementStrategy:
+                                        WebHtmlElementStrategy.prefer,
                                     errorBuilder: (_, __, ___) => Container(
                                       width: 68,
                                       height: 68,

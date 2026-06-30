@@ -395,6 +395,7 @@ class _CartPageState extends State<CartPage> {
                                   child: Image.network(
                                     item['image'],
                                     fit: BoxFit.cover,
+                                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
                                     errorBuilder: (_, _, _) => const Icon(
                                       Icons.image,
                                       color: Colors.grey,
