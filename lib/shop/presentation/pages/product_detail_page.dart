@@ -785,22 +785,26 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         onPageChanged: (index) =>
                             setState(() => currentImageIndex = index),
                         itemBuilder: (context, index) {
+                          final imageUrl = imageList[index];
+                          print('🔵 Loading carousel image: $imageUrl');
                           return Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Image.network(
-                              imageList[index],
+                              imageUrl,
                               width: double.infinity,
                               fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                    width: double.infinity,
-                                    color: kSurface,
-                                    child: const Icon(
-                                      Icons.image_not_supported_outlined,
-                                      size: 64,
-                                      color: kTextMuted,
-                                    ),
+                              errorBuilder: (context, error, stackTrace) {
+                                print('🔴 Image failed: $imageUrl — $error');
+                                return Container(
+                                  width: double.infinity,
+                                  color: kSurface,
+                                  child: const Icon(
+                                    Icons.image_not_supported_outlined,
+                                    size: 64,
+                                    color: kTextMuted,
                                   ),
+                                );
+                              },
                             ),
                           );
                         },
