@@ -119,12 +119,13 @@ class CartService {
     required int userId,
     required int productId,
     required int quantity,
-    int? cartItemId,
+    required int cartItemId, // ← make required, matches ApiService now
   }) async {
     final ok = await ApiService.updateCartItem(
       userId: userId,
       productId: productId,
       quantity: quantity,
+      cartItemId: cartItemId, // ← was missing entirely
     );
     if (ok) {
       updateLocalQuantity(productId, quantity);

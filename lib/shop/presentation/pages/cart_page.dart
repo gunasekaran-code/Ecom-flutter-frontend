@@ -183,6 +183,7 @@ class _CartPageState extends State<CartPage> {
     final availableStock =
         ((cartItems[index]['available_stock'] as num?)?.toInt() ?? 0);
     final productId = cartItems[index]['product_id'];
+    final cartItemId = cartItems[index]['cart_id'] as int?; // ← add this
 
     if (availableStock < 1) {
       showAppSnackBar(
@@ -210,6 +211,18 @@ class _CartPageState extends State<CartPage> {
       return;
     }
 
+    if (cartItemId == null) {
+      // ← guard against missing ID
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: 'Could not update cart: missing cart item reference',
+        type: AppSnackBarType.error,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
     final previousQuantity = currentQuantity;
     setState(() {
       cartItems[index]['quantity'] = newQuantity;
@@ -219,6 +232,7 @@ class _CartPageState extends State<CartPage> {
       userId: widget.userId,
       productId: productId,
       quantity: newQuantity,
+      cartItemId: cartItemId, // ← the actual missing piece
     );
     if (!ok && mounted) {
       setState(() {

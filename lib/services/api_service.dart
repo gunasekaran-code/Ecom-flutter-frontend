@@ -487,6 +487,28 @@ class ApiService {
   //   }
   // }
 
+  static String? _colorNameToHex(String label) {
+    final key = label.trim().toLowerCase();
+    const map = {
+      'red': '#E53935',
+      'blue': '#1E88E5',
+      'green': '#43A047',
+      'black': '#212121',
+      'white': '#FAFAFA',
+      'yellow': '#FDD835',
+      'orange': '#FB8C00',
+      'pink': '#EC407A',
+      'purple': '#8E24AA',
+      'grey': '#9E9E9E',
+      'gray': '#9E9E9E',
+      'brown': '#6D4C41',
+      'navy': '#1A237E',
+      'maroon': '#800000',
+      'beige': '#D7C4A3',
+    };
+    return map[key];
+  }
+
   static Future<List<Map<String, dynamic>>> getProducts({
     String? category,
   }) async {
@@ -524,12 +546,104 @@ class ApiService {
   static Future<Map<String, dynamic>?> getProductDetail(int id) async {
     try {
       _log('Fetching product detail ID: $id');
-      final products = await getProducts();
-      for (final product in products) {
-        final productId = int.tryParse(product['id']?.toString() ?? '');
-        if (productId == id) return product;
+      final response = await _getJson('/user/products/$id');
+      _log('Product detail: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final decoded = _decodeBody(response);
+        final rawData = decoded is Map<String, dynamic>
+            ? (decoded['data'] is Map<String, dynamic>
+                  ? Map<String, dynamic>.from(decoded['data'])
+                  : decoded)
+            : null;
+        if (rawData == null) return null;
+
+        // ── Flatten nested `product` object up to the top level ──
+        // Backend returns { product: {...}, price, stock, images, variations, ... }
+        // but the rest of the app expects one flat product map.
+        final Map<String, dynamic> data = Map<String, dynamic>.from(rawData);
+        final nestedProduct = rawData['product'];
+        if (nestedProduct is Map<String, dynamic>) {
+          data.addAll(nestedProduct); // product fields first...
+          // ...then re-apply the sibling overrides so they win (fresher price/stock/images)
+          for (final key in [
+            'price',
+            'stock',
+            'images',
+            'variations',
+            'average_rating',
+            'total_reviews',
+            'reviews',
+            'related_products',
+          ]) {
+            if (rawData.containsKey(key)) data[key] = rawData[key];
+          }
+        }
+
+        // ── Flatten variations: backend groups by type as an object ──
+        // { "size": [ {variation_item_id, value, price, stock, image}, ... ],
+        //   "color": [ ... ] }
+        // Flutter's chip UI needs a flat list: [ {id, type, label, price, stock, image, color_hex?}, ... ]
+        final rawVariations = data['variations'];
+        if (rawVariations is Map<String, dynamic>) {
+          final List<Map<String, dynamic>> flat = [];
+          rawVariations.forEach((type, options) {
+            if (options is List) {
+              for (final opt in options) {
+                if (opt is Map<String, dynamic>) {
+                  final stock =
+                      int.tryParse(opt['stock']?.toString() ?? '') ?? 0;
+                  final label =
+                      opt['value']?.toString() ??
+                      opt['label']?.toString() ??
+                      '';
+                  final normalizedType = type.toString().toLowerCase();
+                  flat.add({
+                    'id': opt['variation_item_id'] ?? opt['id'],
+                    'type': normalizedType,
+                    'label': label,
+                    'value': label,
+                    'price': opt['price'],
+                    'stock': stock,
+                    'is_available': opt['is_available'] ?? (stock > 0),
+                    'image': opt['image'] ?? opt['image_url'],
+                    if (normalizedType == 'color')
+                      'color_hex': _colorNameToHex(label),
+                  });
+                }
+              }
+            }
+          });
+          data['variations'] = flat;
+        } else if (rawVariations is! List) {
+          data['variations'] = <Map<String, dynamic>>[];
+        }
+
+        final normalized = _normalizeProduct(data);
+
+        final variations = normalized['variations'];
+        if (variations is List) {
+          normalized['variations'] = variations.map((v) {
+            if (v is Map<String, dynamic>) {
+              final parsedVariation = Map<String, dynamic>.from(v);
+              parsedVariation['image_url'] = _absoluteAssetUrl(
+                _firstStringValue(parsedVariation, [
+                  'image_url',
+                  'image',
+                  'variation_image',
+                  'image_path',
+                ]),
+              );
+              return parsedVariation;
+            }
+            return v;
+          }).toList();
+        }
+        return normalized;
       }
-      _logError('Product detail not found: $id');
+
+      _logError(
+        'Product detail failed: ${response.statusCode} ${response.body}',
+      );
       return null;
     } catch (e) {
       _logError('Error fetching product detail: $e');
@@ -635,13 +749,28 @@ class ApiService {
     return [];
   }
 
+  static Future<http.Response> _putJson(
+    String path,
+    Map<String, dynamic> body, {
+    bool authenticated = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
+    _log('PUT $uri');
+    _log('Request body: ${jsonEncode(body)}');
+    final headers = authenticated ? await _authHeaders() : _jsonHeaders;
+    return http
+        .put(uri, headers: headers, body: jsonEncode(body))
+        .timeout(_requestTimeout);
+  }
+
   static Future<bool> updateCartItem({
     required int userId,
     required int productId,
     required int quantity,
+    required int cartItemId,
   }) async {
     try {
-      final response = await _postJson('/user/cart/update', {
+      final response = await _putJson('/user/cart/update/$cartItemId', {
         'user_id': userId,
         'product_id': productId,
         'quantity': quantity,

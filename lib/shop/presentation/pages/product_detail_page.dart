@@ -82,17 +82,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> fetchData() async {
-    if (widget.initialProduct != null) {
-      await _fetchRelatedProducts();
-      if (!mounted) return;
-      setState(() => isLoading = false);
-      return;
-    }
-    final productDetail = await ApiService.getProductDetail(widget.productId);
-    await _fetchRelatedProducts();
+    // Show the list-item data immediately while fetching the full detail.
+    final freshDetailFuture = ApiService.getProductDetail(widget.productId);
+    final relatedFuture = _fetchRelatedProducts();
+
+    final freshDetail = await freshDetailFuture;
+    await relatedFuture;
     if (!mounted) return;
+
     setState(() {
-      product = productDetail;
+      // Prefer the fresh detail (has variations); fall back to initialProduct if the fetch failed.
+      product = freshDetail ?? widget.initialProduct ?? product;
       isLoading = false;
     });
   }
