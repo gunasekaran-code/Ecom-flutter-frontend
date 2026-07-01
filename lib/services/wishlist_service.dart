@@ -24,8 +24,44 @@ class WishlistService {
       .map((product) => Map<String, dynamic>.from(product))
       .toList();
 
+  Map<String, dynamic>? localProduct(int productId) {
+    final product = _localWishlistProducts[productId];
+    return product == null ? null : Map<String, dynamic>.from(product);
+  }
+
   bool isInLocalWishlist(int productId) {
     return _localWishlistProducts.containsKey(productId);
+  }
+
+  int _productKey(Map<String, dynamic> product) {
+    return int.tryParse(product['product_id']?.toString() ?? '') ??
+        ProductData.id(product);
+  }
+
+  void replaceLocalProducts(
+    Iterable<Map<String, dynamic>> products, {
+    bool notify = true,
+  }) {
+    _localWishlistProducts
+      ..clear()
+      ..addEntries(
+        products
+            .where((product) => _productKey(product) > 0)
+            .map(
+              (product) => MapEntry(
+                _productKey(product),
+                Map<String, dynamic>.from(product),
+              ),
+            ),
+      );
+    if (notify) {
+      notifyWishlistChange(WishlistChangeEvent(productId: 0, isAdded: true));
+    }
+  }
+
+  void clearLocalWishlist() {
+    _localWishlistProducts.clear();
+    notifyWishlistChange(WishlistChangeEvent(productId: 0, isAdded: false));
   }
 
   void addLocalProduct(Map<String, dynamic> product) {

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:wss_sports/core/localization/app_strings.dart';
 import 'package:wss_sports/core/localization/app_language.dart';
 import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/services/cart_service.dart';
+import 'package:wss_sports/services/wishlist_service.dart';
 import 'package:wss_sports/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wss_sports/settings/presentation/pages/language_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
@@ -371,64 +373,68 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-// ===== Logout =====
-Widget _buildLogoutButton(BuildContext context, AppStrings strings) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: SizedBox(
-      width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [kBrandRed, kBrandRedDark],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: kBrandRed.withOpacity(0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+  // ===== Logout =====
+  Widget _buildLogoutButton(BuildContext context, AppStrings strings) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              colors: [kBrandRed, kBrandRedDark],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            // ── Show the shared dialog ──────────────────────────────
-            final confirmed = await showLogoutDialog(context);
+            boxShadow: [
+              BoxShadow(
+                color: kBrandRed.withOpacity(0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              // ── Show the shared dialog ──────────────────────────────
+              final confirmed = await showLogoutDialog(context);
 
-            if (confirmed == true && context.mounted) {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/LoginPage',
-                (route) => false,
-              );
-            }
-          },
-          icon: const Icon(Icons.logout_rounded, size: 20),
-          label: Text(
-            strings.logout,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
+              if (confirmed == true && context.mounted) {
+                await ApiService.clearToken();
+                CartService().clearLocalCart();
+                WishlistService().clearLocalWishlist();
+                if (!context.mounted) return;
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/LoginPage',
+                  (route) => false,
+                );
+              }
+            },
+            icon: const Icon(Icons.logout_rounded, size: 20),
+            label: Text(
+              strings.logout,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ===== Reusable action item =====

@@ -158,6 +158,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Future<void> _addToCart() async {
     final currentProduct = product;
     if (currentProduct == null || isAddingToCart) return;
+    final productId = ProductData.id(currentProduct);
+    if (CartService().isInLocalCart(productId)) {
+      showAppSnackBar(
+        context,
+        title: 'Info',
+        message: 'This item is already in your cart',
+        type: AppSnackBarType.info,
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CartPage(userId: widget.userData['id']),
+        ),
+      );
+      return;
+    }
+
     setState(() => isAddingToCart = true);
     final added = await CartService().addProduct(
       userId: widget.userData['id'],
@@ -169,7 +186,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       showAppSnackBar(
         context,
         title: 'Error',
-        message: 'Could not add this item to cart',
+        message: ApiService.lastCartError ?? 'Could not add this item to cart',
         type: AppSnackBarType.error,
       );
       return;

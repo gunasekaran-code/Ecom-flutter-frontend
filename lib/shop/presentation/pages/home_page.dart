@@ -69,6 +69,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     fetchProducts();
+    _hydrateWishlist();
     fetchCartCount();
     _fetchCategories();
     _searchController.addListener(_onSearchChanged);
@@ -160,7 +161,46 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchCartCount() async {
-    setState(() => cartCount = CartService().localCartCount);
+    final serverItems = await ApiService.getCart(widget.userData['id']);
+    if (!mounted) return;
+
+    final count = serverItems.fold<int>(
+      0,
+      (sum, item) =>
+          sum +
+          (int.tryParse(
+                (item is Map ? item['quantity'] ?? item['qty'] : 0).toString(),
+              ) ??
+              0),
+    );
+
+    setState(() => cartCount = count);
+  }
+
+  Future<void> _hydrateWishlist() async {
+    final serverItems = await ApiService.getWishlist(widget.userData['id']);
+    if (!mounted) return;
+
+    final products = serverItems
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          final product = item['product'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(item['product'])
+              : Map<String, dynamic>.from(item);
+          final productId =
+              int.tryParse(
+                (item['product_id'] ?? product['id'] ?? product['product_id'])
+                    .toString(),
+              ) ??
+              ProductData.id(product);
+          final wishlistItem = ProductData.toWishlistItem(product);
+          wishlistItem['product_id'] = productId;
+          return wishlistItem;
+        })
+        .where((item) => ((item['product_id'] as int?) ?? 0) > 0)
+        .toList();
+
+    WishlistService().replaceLocalProducts(products);
   }
 
   Future<void> _showAllProducts() async {

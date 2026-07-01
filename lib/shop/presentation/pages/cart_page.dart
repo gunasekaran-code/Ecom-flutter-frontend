@@ -36,11 +36,12 @@ class _CartPageState extends State<CartPage> {
   Future<void> loadCart() async {
     final serverItems = await ApiService.getCart(widget.userId);
     if (!mounted) return;
-    if (serverItems.isNotEmpty) {
-      _applyCartItems(serverItems.map(_normalizeCartItem).toList());
-      return;
-    }
-    _applyCartItems(CartService().localCartItems);
+    final items = serverItems.isNotEmpty
+        ? serverItems.map(_normalizeCartItem).toList()
+        : CartService().localCartItems;
+    CartService().replaceLocalProducts(items, notify: false);
+    if (!mounted) return;
+    _applyCartItems(items);
   }
 
   Map<String, dynamic> _normalizeCartItem(dynamic item) {
@@ -65,6 +66,9 @@ class _CartPageState extends State<CartPage> {
               .toString(),
         ) ??
         cartItem['product_id'];
+    cartItem['cart_id'] = int.tryParse(
+      (data['id'] ?? data['cart_id'] ?? data['cart_item_id'] ?? '').toString(),
+    );
     return cartItem;
   }
 
@@ -267,6 +271,7 @@ class _CartPageState extends State<CartPage> {
     final ok = await CartService().removeProduct(
       userId: widget.userId,
       productId: productId,
+      cartItemId: cartItems[index]['cart_id'] as int?,
     );
     if (!ok) {
       setState(() {
@@ -452,26 +457,39 @@ class _CartPageState extends State<CartPage> {
                                     : null,
                                 activeColor: kBrandRed,
                               ),
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEEEEEE),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    item['image'],
-                                    fit: BoxFit.cover,
-                                    webHtmlElementStrategy:
-                                        WebHtmlElementStrategy.prefer,
-                                    errorBuilder: (_, _, _) => const Icon(
-                                      Icons.image,
-                                      color: Colors.grey,
+                              Builder(
+                                builder: (context) {
+                                  final imageUrl = item['image']?.toString();
+                                  return Container(
+                                    width: 80,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEEEEEE),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                  ),
-                                ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child:
+                                          imageUrl != null &&
+                                              imageUrl.isNotEmpty
+                                          ? Image.network(
+                                              imageUrl,
+                                              fit: BoxFit.cover,
+                                              webHtmlElementStrategy:
+                                                  WebHtmlElementStrategy.prefer,
+                                              errorBuilder: (_, _, _) =>
+                                                  const Icon(
+                                                    Icons.image,
+                                                    color: Colors.grey,
+                                                  ),
+                                            )
+                                          : const Icon(
+                                              Icons.image,
+                                              color: Colors.grey,
+                                            ),
+                                    ),
+                                  );
+                                },
                               ),
                               const SizedBox(width: 12),
                               Expanded(

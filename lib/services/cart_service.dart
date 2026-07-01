@@ -32,6 +32,35 @@ class CartService {
     return _localCartItems.containsKey(productId);
   }
 
+  int _productKey(Map<String, dynamic> item) {
+    return int.tryParse(item['product_id']?.toString() ?? '') ??
+        ProductData.id(item);
+  }
+
+  void replaceLocalProducts(
+    Iterable<Map<String, dynamic>> items, {
+    bool notify = true,
+  }) {
+    _localCartItems
+      ..clear()
+      ..addEntries(
+        items
+            .where((item) => _productKey(item) > 0)
+            .map(
+              (item) =>
+                  MapEntry(_productKey(item), Map<String, dynamic>.from(item)),
+            ),
+      );
+    if (notify) {
+      notifyCartChange(CartChangeEvent(productId: 0, isAdded: true));
+    }
+  }
+
+  void clearLocalCart() {
+    _localCartItems.clear();
+    notifyCartChange(CartChangeEvent(productId: 0, isAdded: false));
+  }
+
   void addLocalProduct(Map<String, dynamic> product, {int quantity = 1}) {
     final productId = ProductData.id(product);
     final existingItem = _localCartItems[productId];
@@ -90,6 +119,7 @@ class CartService {
     required int userId,
     required int productId,
     required int quantity,
+    int? cartItemId,
   }) async {
     final ok = await ApiService.updateCartItem(
       userId: userId,
@@ -110,10 +140,12 @@ class CartService {
   Future<bool> removeProduct({
     required int userId,
     required int productId,
+    int? cartItemId,
   }) async {
     final ok = await ApiService.removeFromCart(
       userId: userId,
       productId: productId,
+      cartItemId: cartItemId,
     );
     if (ok) {
       removeLocalProduct(productId);

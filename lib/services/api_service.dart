@@ -5,11 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.15:8000/api';
+  static const String baseUrl = 'http://192.168.1.10:8000/api';
   static final String _assetBaseUrl = Uri.parse(baseUrl).origin;
 
   static const bool debugMode = true;
   static const Duration _requestTimeout = Duration(seconds: 30);
+  static String? lastCartError;
 
   static void _log(String message) {
     if (debugMode) print('🔵 [API] $message');
@@ -138,10 +139,17 @@ class ApiService {
       'productImage',
       'image_path',
       'imagePath',
+      'image_name',
+      'product_img',
+      'productImageUrl',
+      'product_image_url',
       'thumbnail',
       'thumbnail_url',
+      'thumb',
       'photo',
+      'photo_url',
       'main_image',
+      'main_image_url',
     ]);
     normalized['image_url'] = _absoluteAssetUrl(image);
 
@@ -156,6 +164,7 @@ class ApiService {
               'image',
               'product_image',
               'image_path',
+              'image_name',
               'url',
               'path',
             ]),
@@ -176,13 +185,17 @@ class ApiService {
     for (final key in keys) {
       final value = decoded[key];
       if (value is List) return value;
+      if (value is Map<String, dynamic>) {
+        final nested = _listFromDecoded(value, keys);
+        if (nested.isNotEmpty) return nested;
+      }
     }
 
     return const <dynamic>[];
   }
 
   static List<dynamic> _cartListFromDecoded(dynamic decoded) =>
-      _listFromDecoded(decoded, ['data', 'cart', 'items', 'cart_items']);
+      _listFromDecoded(decoded, ['data', 'cart', 'items', 'cart_items', 'cartitems']);
 
   static List<dynamic> _wishlistListFromDecoded(dynamic decoded) =>
       _listFromDecoded(decoded, ['data', 'wishlist', 'items', 'products']);
@@ -528,23 +541,87 @@ class ApiService {
     int quantity = 1,
   }) async {
     try {
+      lastCartError = null;
+      if (productId <= 0) {
+        lastCartError = 'Invalid product selected.';
+        _logError('Invalid product id for add to cart: $productId');
+        return false;
+      }
+
       final response = await _postJson('/user/cart/add', {
-        'user_id': userId,
         'product_id': productId,
         'quantity': quantity,
       }, authenticated: true);
-      return _isSuccessStatus(response.statusCode);
+      if (_isSuccessStatus(response.statusCode)) {
+        return true;
+      }
+
+      final decoded = _decodeBody(response);
+      final message = _errorMessage(decoded, 'Could not add item to cart');
+      if (response.statusCode == 400 && _isAlreadyInCartMessage(message)) {
+        return true;
+      }
+
+      if (response.statusCode == 400 && message.toLowerCase().contains('qty')) {
+        final qtyResponse = await _postJson('/user/cart/add', {
+          'product_id': productId,
+          'qty': quantity,
+        }, authenticated: true);
+        if (_isSuccessStatus(qtyResponse.statusCode)) {
+          return true;
+        }
+
+        final qtyDecoded = _decodeBody(qtyResponse);
+        final qtyMessage = _errorMessage(
+          qtyDecoded,
+          'Could not add item to cart',
+        );
+        if (qtyResponse.statusCode == 400 &&
+            _isAlreadyInCartMessage(qtyMessage)) {
+          return true;
+        }
+        _logError(
+          'Add to cart failed: ${qtyResponse.statusCode} ${qtyResponse.body}',
+        );
+        lastCartError = qtyMessage;
+        return false;
+      }
+
+      _logError('Add to cart failed: ${response.statusCode} ${response.body}');
+      lastCartError = message;
+      return false;
     } catch (e) {
+      lastCartError = 'Could not add item to cart.';
       _logError('Error adding to cart: $e');
       return false;
     }
   }
 
+  static bool _isAlreadyInCartMessage(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('already') &&
+        (normalized.contains('cart') || normalized.contains('exist'));
+  }
+
   static Future<List<dynamic>> getCart(int userId) async {
     try {
       final response = await _getJson('/user/cart');
+      // final response = await _getJson('/user/cart/$userId', authenticated: true);
       if (response.statusCode == 200) {
-        return _cartListFromDecoded(_decodeBody(response));
+        final decoded = _decodeBody(response);
+        final items = _cartListFromDecoded(decoded);
+        return items.map((item) {
+          if (item is Map<String, dynamic>) {
+            final normalized = Map<String, dynamic>.from(item);
+            if (normalized['product'] is Map<String, dynamic>) {
+              normalized['product'] = _normalizeProduct(
+                Map<String, dynamic>.from(normalized['product']),
+              );
+            }
+            return normalized;
+          }
+          return item;
+        }).toList();
       }
     } catch (e) {
       _logError('Error fetching cart: $e');
@@ -586,28 +663,21 @@ class ApiService {
   static Future<bool> removeFromCart({
     required int userId,
     required int productId,
+    int? cartItemId,
   }) async {
     try {
-      final body = {'user_id': userId, 'product_id': productId};
+      final id = cartItemId ?? productId;
+      final response = await _deleteJson(
+        // '/cart/remove/$id',
+        '/user/cart/remove/$id',
+        authenticated: true,
+      );
 
-      final attempts = [
-        () => _deleteJson('/user/cart/remove/$productId/', authenticated: true),
-        () => _postJson('/cart/remove/', body),
-        () => _postJson('/cart/remove', body),
-        () => _deleteJson('/cart/remove/$productId/'),
-        () => _deleteJson('/cart/remove/$productId'),
-      ];
-
-      for (final attempt in attempts) {
-        final response = await attempt();
-        if (_isSuccessStatus(response.statusCode)) {
-          return true;
-        }
-        if (response.statusCode != 404 && response.statusCode != 405) {
-          return false;
-        }
+      if (_isSuccessStatus(response.statusCode)) {
+        return true;
       }
 
+      _logError('Remove cart failed: ${response.statusCode} ${response.body}');
       return false;
     } catch (e) {
       _logError('Error removing from cart: $e');
@@ -972,149 +1042,3 @@ class ApiService {
     return 83.0;
   }
 }
-
-// /// Admin — fetch all products including soft-deleted ones.
-// static Future<List<Map<String, dynamic>>> getAllProductsAdmin() async {
-//   try {
-//     _log('Fetching all admin products');
-//     final response = await _getJson('/admin/products/');
-//     if (response.statusCode == 200) {
-//       final data = jsonDecode(response.body) as List<dynamic>;
-//       return data.cast<Map<String, dynamic>>();
-//     }
-//     _logError('Admin products failed: ${response.statusCode}');
-//     return [];
-//   } catch (e) {
-//     _logError('Error fetching admin products: $e');
-//     return [];
-//   }
-// }
-
-// /// Admin — create a new product.
-// static Future<Map<String, dynamic>> createProduct({
-//   required String name,
-//   required String description,
-//   required double price,
-//   required int categoryId,
-//   required int stock,
-//   double rating = 0.0,
-//   int? skuId,
-//   XFile? imageFile,
-// }) async {
-//   try {
-//     _log('Creating product: $name');
-//     final request = http.MultipartRequest(
-//       'POST',
-//       Uri.parse('$baseUrl/admin/products/create/'),
-//     );
-//     request.fields['name'] = name;
-//     request.fields['description'] = description;
-//     request.fields['price'] = price.toString();
-//     request.fields['category'] = categoryId.toString();
-//     request.fields['stock'] = stock.toString();
-//     request.fields['rating'] = rating.toString();
-//     if (skuId != null) request.fields['sku_id'] = skuId.toString();
-//     if (imageFile != null) {
-//       final bytes = await imageFile.readAsBytes();
-//       request.files.add(
-//         http.MultipartFile.fromBytes(
-//           'image',
-//           bytes,
-//           filename: imageFile.name,
-//         ),
-//       );
-//     }
-//     final response = await request.send();
-//     final responseData = await response.stream.bytesToString();
-//     _log('Create product: ${response.statusCode}');
-//     if (response.statusCode == 201) {
-//       return {'success': true, 'data': jsonDecode(responseData)};
-//     }
-//     return {
-//       'success': false,
-//       'error': 'HTTP ${response.statusCode}: $responseData',
-//     };
-//   } catch (e) {
-//     _logError('Error creating product: $e');
-//     return {'success': false, 'error': 'Network error: $e'};
-//   }
-// }
-
-// /// Admin — update an existing product.
-// static Future<Map<String, dynamic>> updateProduct({
-//   required int id,
-//   required String name,
-//   required String description,
-//   required double price,
-//   required int categoryId,
-//   required int stock,
-//   double rating = 0.0,
-//   int? skuId,
-//   bool removeImage = false,
-//   XFile? imageFile,
-// }) async {
-//   try {
-//     _log('Updating product ID: $id');
-//     final request = http.MultipartRequest(
-//       'PUT',
-//       Uri.parse('$baseUrl/admin/products/update/$id/'),
-//     );
-//     request.fields['name'] = name;
-//     request.fields['description'] = description;
-//     request.fields['price'] = price.toString();
-//     request.fields['category'] = categoryId.toString();
-//     request.fields['stock'] = stock.toString();
-//     request.fields['rating'] = rating.toString();
-//     if (skuId != null) request.fields['sku_id'] = skuId.toString();
-//     if (removeImage) request.fields['remove_image'] = 'true';
-//     if (imageFile != null) {
-//       final bytes = await imageFile.readAsBytes();
-//       request.files.add(
-//         http.MultipartFile.fromBytes(
-//           'image',
-//           bytes,
-//           filename: imageFile.name,
-//         ),
-//       );
-//     }
-//     final response = await request.send();
-//     final responseData = await response.stream.bytesToString();
-//     _log('Update product: ${response.statusCode}');
-//     if (response.statusCode == 200) {
-//       return {'success': true, 'data': jsonDecode(responseData)};
-//     }
-//     return {
-//       'success': false,
-//       'error': 'HTTP ${response.statusCode}: $responseData',
-//     };
-//   } catch (e) {
-//     _logError('Error updating product: $e');
-//     return {'success': false, 'error': 'Network error: $e'};
-//   }
-// }
-
-// /// Admin — soft-delete a product.
-// static Future<bool> softDeleteProduct(int id) async {
-//   try {
-//     final response = await http
-//         .delete(Uri.parse('$baseUrl/admin/products/soft-delete/$id/'))
-//         .timeout(_requestTimeout);
-//     return response.statusCode == 200;
-//   } catch (e) {
-//     _logError('Error soft deleting product: $e');
-//     return false;
-//   }
-// }
-
-// /// Admin — restore a soft-deleted product.
-// static Future<bool> restoreProduct(int id) async {
-//   try {
-//     final response = await http
-//         .post(Uri.parse('$baseUrl/admin/products/restore/$id/'))
-//         .timeout(_requestTimeout);
-//     return response.statusCode == 200;
-//   } catch (e) {
-//     _logError('Error restoring product: $e');
-//     return false;
-//   }
-// }

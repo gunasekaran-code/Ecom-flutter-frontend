@@ -53,20 +53,12 @@ class _WishlistPageState extends State<WishlistPage> {
   Future<void> _loadWishlist() async {
     final serverItems = await ApiService.getWishlist(widget.userData['id']);
     if (!mounted) return;
-    if (serverItems.isNotEmpty) {
-      setState(() {
-        wishlistItems = serverItems.map(_normalizeWishlistItem).toList();
-        isLoading = false;
-      });
-      return;
-    }
-
-    final localItems = WishlistService().localWishlistProducts
-        .map((product) => ProductData.toWishlistItem(product))
-        .toList();
+    final items = serverItems.map(_normalizeWishlistItem).toList();
+    WishlistService().replaceLocalProducts(items, notify: false);
+    if (!mounted) return;
 
     setState(() {
-      wishlistItems = localItems;
+      wishlistItems = items;
       isLoading = false;
     });
   }
@@ -79,12 +71,23 @@ class _WishlistPageState extends State<WishlistPage> {
         ? Map<String, dynamic>.from(data['product'])
         : data;
     final wishlistItem = ProductData.toWishlistItem(product);
-    wishlistItem['product_id'] =
+    final productId =
         int.tryParse(
           (data['product_id'] ?? product['id'] ?? product['product_id'] ?? 0)
               .toString(),
         ) ??
         wishlistItem['product_id'];
+    wishlistItem['product_id'] = productId;
+
+    final localProduct = WishlistService().localProduct(productId);
+    final localImage = localProduct == null
+        ? null
+        : ProductData.image(localProduct);
+    if (localImage != null) {
+      wishlistItem['image'] = localImage;
+      wishlistItem['raw_product'] = localProduct;
+    }
+
     return wishlistItem;
   }
 
