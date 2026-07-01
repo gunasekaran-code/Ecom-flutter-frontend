@@ -54,9 +54,14 @@ class _WishlistPageState extends State<WishlistPage> {
     final serverItems = await ApiService.getWishlist(widget.userData['id']);
     if (!mounted) return;
     final items = serverItems.map(_normalizeWishlistItem).toList();
-    WishlistService().replaceLocalProducts(items, notify: false);
-    if (!mounted) return;
 
+    final rawProducts = items
+        .map((item) => item['raw_product'])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    WishlistService().replaceLocalProducts(rawProducts, notify: false);
+
+    if (!mounted) return;
     setState(() {
       wishlistItems = items;
       isLoading = false;
@@ -78,16 +83,9 @@ class _WishlistPageState extends State<WishlistPage> {
         ) ??
         wishlistItem['product_id'];
     wishlistItem['product_id'] = productId;
-
-    final localProduct = WishlistService().localProduct(productId);
-    final localImage = localProduct == null
-        ? null
-        : ProductData.image(localProduct);
-    if (localImage != null) {
-      wishlistItem['image'] = localImage;
-      wishlistItem['raw_product'] = localProduct;
-    }
-
+    wishlistItem['raw_product'] =
+        product; // full normalized product, not the stripped item
+    wishlistItem['image'] = ProductData.image(product) ?? wishlistItem['image'];
     return wishlistItem;
   }
 
@@ -275,6 +273,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 itemBuilder: (context, index) {
                   final item = wishlistItems[index];
                   return WishlistItemCard(
+                    key: ValueKey(item['product_id']),   // <-- add this
                     item: item,
                     userData: widget.userData,
                     onRemove: () => _removeFromWishlist(item['product_id']),
@@ -417,6 +416,7 @@ class WishlistItemCard extends StatelessWidget {
                 child: item['image'] != null
                     ? Image.network(
                         item['image'],
+                        key: ValueKey(item['image']),
                         width: 110,
                         height: 140,
                         fit: BoxFit.cover,

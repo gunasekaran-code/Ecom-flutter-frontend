@@ -195,7 +195,13 @@ class ApiService {
   }
 
   static List<dynamic> _cartListFromDecoded(dynamic decoded) =>
-      _listFromDecoded(decoded, ['data', 'cart', 'items', 'cart_items', 'cartitems']);
+      _listFromDecoded(decoded, [
+        'data',
+        'cart',
+        'items',
+        'cart_items',
+        'cartitems',
+      ]);
 
   static List<dynamic> _wishlistListFromDecoded(dynamic decoded) =>
       _listFromDecoded(decoded, ['data', 'wishlist', 'items', 'products']);
@@ -823,7 +829,20 @@ class ApiService {
     try {
       final response = await _getJson('/user/wishlist');
       if (response.statusCode == 200) {
-        return _wishlistListFromDecoded(_decodeBody(response));
+        final decoded = _decodeBody(response);
+        final items = _wishlistListFromDecoded(decoded);
+        return items.map((item) {
+          if (item is Map<String, dynamic>) {
+            final normalized = Map<String, dynamic>.from(item);
+            if (normalized['product'] is Map<String, dynamic>) {
+              normalized['product'] = _normalizeProduct(
+                Map<String, dynamic>.from(normalized['product']),
+              );
+            }
+            return normalized;
+          }
+          return item;
+        }).toList();
       }
     } catch (e) {
       _logError('Error fetching wishlist: $e');

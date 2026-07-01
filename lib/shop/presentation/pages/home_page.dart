@@ -677,9 +677,10 @@ class _ProductCardState extends State<ProductCard> {
     _wishlistSubscription = WishlistService().wishlistChangeStream.listen((
       event,
     ) {
-      if (event.productId == ProductData.id(widget.product)) {
+      final productId = ProductData.id(widget.product);
+      if (event.productId == productId || event.productId == 0) {
         setState(() {
-          _isInWishlist = event.isAdded;
+          _isInWishlist = WishlistService().isInLocalWishlist(productId);
         });
       }
     });
