@@ -803,7 +803,6 @@ class ApiService {
     try {
       final id = cartItemId ?? productId;
       final response = await _deleteJson(
-        // '/cart/remove/$id',
         '/user/cart/remove/$id',
         authenticated: true,
       );
@@ -820,21 +819,7 @@ class ApiService {
     }
   }
 
-  // static Future<bool> removeFromCart({
-  //   required int userId,
-  //   required int productId,
-  // }) async {
-  //   try {
-  //     final response = await _postJson('user/cart/remove/{$id}', {
-  //       'user_id': userId,
-  //       'product_id': productId,
-  //     }, authenticated: true);
-  //     return _isSuccessStatus(response.statusCode);
-  //   } catch (e) {
-  //     _logError('Error removing from cart: $e');
-  //     return false;
-  //   }
-  // }
+
 
   static Future<int> getCartCount(int userId) async {
     final cart = await getCart(userId);

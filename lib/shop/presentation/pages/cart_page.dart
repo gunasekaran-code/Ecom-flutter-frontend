@@ -277,6 +277,8 @@ class _CartPageState extends State<CartPage> {
     final productId = cartItems[index]['product_id'];
     final productName = cartItems[index]['product_name'];
     final removedItem = Map<String, dynamic>.from(cartItems[index]);
+    final removedCartItemId = removedItem['cart_id'] as int?;
+
     setState(() {
       cartItems.removeAt(index);
       selectedProductIds.remove(productId);
@@ -285,8 +287,10 @@ class _CartPageState extends State<CartPage> {
     final ok = await CartService().removeProduct(
       userId: widget.userId,
       productId: productId,
-      cartItemId: cartItems[index]['cart_id'] as int?,
+      cartItemId:
+          removedCartItemId,
     );
+
     if (!ok) {
       setState(() {
         cartItems.insert(index, removedItem);
@@ -302,6 +306,7 @@ class _CartPageState extends State<CartPage> {
       }
       return;
     }
+
     if (mounted) {
       showAppSnackBar(
         context,
