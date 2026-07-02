@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
-import 'package:wss_sports/services/order_service.dart';
 import 'package:wss_sports/pages/payment_failed_page.dart';
 import 'package:wss_sports/pages/payment_success_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
@@ -472,11 +471,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String get _paymentMethodLabel =>
       _paymentMethod == 'cod' ? 'Cash on Delivery' : 'UPI';
 
-  double _readAmount(dynamic value) =>
-      double.tryParse(value?.toString() ?? '') ?? total;
+  // double _readAmount(dynamic value) =>
+  //     double.tryParse(value?.toString() ?? '') ?? total;
 
-  int _readCount(dynamic value) =>
-      int.tryParse(value?.toString() ?? '') ?? _itemsCount;
+  // int _readCount(dynamic value) =>
+  //     int.tryParse(value?.toString() ?? '') ?? _itemsCount;
 
   Future<void> _confirmDeleteAddress(int addressId) async {
     final confirm = await showDialog<bool>(
