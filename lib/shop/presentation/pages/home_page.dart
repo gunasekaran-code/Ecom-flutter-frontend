@@ -6,6 +6,7 @@ import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/shop/presentation/pages/product_detail_page.dart';
 import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/utils/review_data.dart';
 import 'package:wss_sports/utils/product_data.dart';
 import 'dart:async';
 
@@ -889,8 +890,18 @@ class _ProductCardState extends State<ProductCard> {
                               size: 14,
                             ),
                             const SizedBox(width: 2),
+                            // 1. We wrap the debugPrint statement in an inline block execution
+                            (() {
+                              debugPrint('🔍 full product: ${widget.product}');
+                              debugPrint(
+                                '🔍 product ratings: ${widget.product['average_rating']} / ${widget.product['rating']} / ${widget.product['avg_rating']}',
+                              );
+                              return const SizedBox.shrink(); // Returns an invisible widget that takes 0 space
+                            })(),
                             Text(
-                              ProductData.rating(widget.product).toString(),
+                              ReviewData.averageRating(
+                                widget.product,
+                              ).toStringAsFixed(1),
                               style: const TextStyle(
                                 color: kTextMuted,
                                 fontSize: 12,

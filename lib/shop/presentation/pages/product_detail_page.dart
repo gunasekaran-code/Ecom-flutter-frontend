@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/shop/presentation/pages/cart_page.dart';
+import 'package:wss_sports/shop/presentation/widgets/rating_reviews_sheet.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'package:wss_sports/utils/product_data.dart';
+import 'package:wss_sports/utils/review_data.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final int productId;
@@ -819,7 +821,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             setState(() => currentImageIndex = index),
                         itemBuilder: (context, index) {
                           final imageUrl = imageList[index];
-                          print('🔵 Loading carousel image: $imageUrl');
                           return Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Image.network(
@@ -829,7 +830,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               webHtmlElementStrategy:
                                   WebHtmlElementStrategy.prefer,
                               errorBuilder: (context, error, stackTrace) {
-                                print('🔴 Image failed: $imageUrl — $error');
                                 return Container(
                                   width: double.infinity,
                                   color: kSurface,
@@ -981,33 +981,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Rating
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        ProductData.rating(product!).toString(),
-                        style: const TextStyle(
-                          color: kTextDark,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        '· Rating',
-                        style: TextStyle(color: kTextMuted, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Price — animates when variation changes
+                   // Price — animates when variation changes
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
                     child: Text(
@@ -1022,33 +996,48 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  
 
-                  // Stock — animates when variation changes
-                  Row(
-                    children: [
-                      Icon(
-                        _displayInStock
-                            ? Icons.check_circle
-                            : Icons.cancel_outlined,
-                        color: _displayInStock
-                            ? const Color(0xFF1DB954)
-                            : kBrandRed,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _displayInStock
-                            ? 'In Stock (${_displayStock} units)'
-                            : 'Out of Stock',
-                        style: const TextStyle(
-                          color: kTextMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                  // ── Rating — now a tappable button that opens the
+                  // "Ratings and reviews" popup. ────────────────────
+                  GestureDetector(
+                    onTap: () => showRatingReviewsSheet(context, product!),
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Colors.amber,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          ReviewData.averageRating(product!).toStringAsFixed(1),
+                          style: const TextStyle(
+                            color: kTextDark,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '· ${ReviewData.totalReviews(product!)} Ratings',
+                          style: const TextStyle(
+                            color: kTextMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: kTextMuted,
+                          size: 18,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+
 
                   // ── Variation Selector ────────────────────────────
                   _buildVariationSelector(),
