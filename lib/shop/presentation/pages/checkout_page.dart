@@ -1,9 +1,13 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/services/cart_service.dart';
 import 'package:wss_sports/services/order_service.dart';
+import 'package:wss_sports/pages/payment_failed_page.dart';
 import 'package:wss_sports/pages/payment_success_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class CheckoutPage extends StatefulWidget {
   final int userId;
@@ -26,29 +30,16 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  static const List<Map<String, dynamic>> _staticAddresses = [
-    {
-      'id': 1,
-      'address_type': 'home',
-      'first_name': 'Guna',
-      'last_name': 'Sekaran',
-      'address_line_1': '12 Sports Academy Street',
-      'address_line_2': 'Near Main Ground',
-      'city': 'Chennai',
-      'state': 'Tamil Nadu',
-      'postal_code': '600001',
-      'country': 'India',
-      'is_default': true,
-    },
-  ];
-
   List<Map<String, dynamic>> _savedAddresses = [];
   bool _isLoadingAddresses = true;
   int? _selectedAddressId;
   bool _showAddressForm = false;
-
+  late final Razorpay _razorpay;
+  Map<String, dynamic>? _pendingRazorpayData;
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _addressLine1Controller = TextEditingController();
   final _addressLine2Controller = TextEditingController();
@@ -87,12 +78,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void initState() {
     super.initState();
     _loadSavedAddresses();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
   }
 
   @override
   void dispose() {
+    _razorpay.clear();
     _firstNameController.dispose();
-    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
     _addressLine1Controller.dispose();
     _addressLine2Controller.dispose();
     _cityController.dispose();
@@ -110,8 +107,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       items: widget.selectedItems,
       paymentMethod: _paymentMethod,
       totalAmount: total,
-      addressId: _selectedAddressId,
-      shippingAddress: _selectedAddress,
+      shippingAddress: _selectedAddress!,
     );
 
     if (!mounted) return;
@@ -127,17 +123,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
 
-    final orderData = result['data'];
-    final order = orderData is Map<String, dynamic>
-        ? Map<String, dynamic>.from(orderData['order'] ?? orderData)
-        : OrderService().createOrder(
-            userId: widget.userId,
-            items: widget.selectedItems,
-            paymentMethod: _paymentMethod,
-            totalAmount: total,
-            totalItems: _itemsCount,
-            address: _selectedAddress,
-          );
+    final data = result['data'] as Map<String, dynamic>? ?? {};
+    final orderId = data['order_id'];
+    final orderCode = data['order_code'];
 
     CartService().removeLocalProducts(
       widget.selectedItems
@@ -154,20 +142,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
           subtitle: _paymentMethod == 'cod'
               ? 'Pay at your doorstep'
               : 'Successfully Paid',
-          amount: _readAmount(order['total_amount']),
+          amount: total,
           itemPrice: subtotal,
           deliveryFee: widget.deliveryFee,
           discount: widget.promoApplied
               ? (subtotal * widget.discountPercent / 100)
               : 0.0,
-          itemsCount: _readCount(order['total_items']),
+          itemsCount: _itemsCount,
           paymentMethodLabel: _paymentMethodLabel,
-          orderId: order['id']?.toString(),
-          address: order,
+          orderId: orderId?.toString() ?? orderCode?.toString(),
+          address: _selectedAddress!,
           selectedItems: widget.selectedItems,
-          onContinueShopping: () {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          },
+          onContinueShopping: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
         ),
       ),
     );
@@ -176,46 +163,218 @@ class _CheckoutPageState extends State<CheckoutPage> {
   // ─── Place Order Entry Point ──────────────────────────────────────────────
 
   Future<void> _placeOrder() async {
-    if (_selectedAddressId == null && !_showAddressForm) {
+    if (_showAddressForm) {
+      await _saveNewAddress();
+      if (_selectedAddressId == null) return;
+    }
+    if (_selectedAddress == null) {
       showAppSnackBar(
         context,
         title: 'Alert',
-        message: 'Please select a delivery address',
+        message: 'Please select or add a delivery address',
         type: AppSnackBarType.alert,
       );
       return;
     }
 
-    if (_showAddressForm) {
-      await _saveNewAddress();
-      if (_selectedAddressId == null) return;
+    if (_paymentMethod == 'upi') {
+      await _startRazorpayPayment();
+    } else {
+      await _submitOrderToBackend(); // COD stays on the direct /orders/place flow
     }
-
-    setState(() => _isPlacingOrder = true);
-
-    await _submitOrderToBackend();
   }
-
   // ─── Address ─────────────────────────────────────────────────────────────
 
   Future<void> _loadSavedAddresses() async {
     setState(() => _isLoadingAddresses = true);
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('saved_addresses_${widget.userId}');
+    final list = raw != null
+        ? List<Map<String, dynamic>>.from(
+            (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e)),
+          )
+        : <Map<String, dynamic>>[];
+
     if (!mounted) return;
     setState(() {
       _isLoadingAddresses = false;
-      _savedAddresses = _staticAddresses
-          .map((address) => Map<String, dynamic>.from(address))
-          .toList();
+      _savedAddresses = list;
       if (_savedAddresses.isNotEmpty) {
         final defaultAddress = _savedAddresses.firstWhere(
           (addr) => addr['is_default'] == true,
           orElse: () => _savedAddresses.first,
         );
-        _selectedAddressId = defaultAddress['id'];
+        _selectedAddressId = defaultAddress['id'] as int?;
+        _showAddressForm = false;
       } else {
         _showAddressForm = true;
       }
     });
+  }
+
+  Future<void> _startRazorpayPayment() async {
+    setState(() => _isPlacingOrder = true);
+
+    final result = await ApiService.createRazorpayOrder(
+      items: widget.selectedItems,
+      address: _selectedAddress!,
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] != true) {
+      setState(() => _isPlacingOrder = false);
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: result['error']?.toString() ?? 'Could not start payment',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
+    final data = result['data'] as Map<String, dynamic>;
+    _pendingRazorpayData = data; // keep local_order_id for verify step
+
+    final options = {
+      'key': data['key'],
+      'amount': data['amount'],
+      'currency': data['currency'] ?? 'INR',
+      'name': data['name'] ?? 'WSS Sports',
+      'description': data['description'] ?? 'Order Payment',
+      'order_id': data['razorpay_order_id'],
+      'prefill': {
+        'contact':
+            data['prefill']?['contact'] ?? _selectedAddress?['phone'] ?? '',
+        'email': data['prefill']?['email'] ?? _selectedAddress?['email'] ?? '',
+      },
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (e) {
+      setState(() => _isPlacingOrder = false);
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: 'Could not open payment screen: $e',
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  void _onPaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _isPlacingOrder = false);
+    _goToFailedPage(
+      message: response.message ?? 'Payment could not be completed.',
+      isCancelled: response.code == Razorpay.PAYMENT_CANCELLED,
+    );
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    setState(() => _isPlacingOrder = false);
+    showAppSnackBar(
+      context,
+      title: 'Info',
+      message: 'Selected wallet: ${response.walletName}',
+      type: AppSnackBarType.info,
+    );
+  }
+
+  void _goToFailedPage({
+    required String message,
+    required bool isCancelled,
+    String? paymentId,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaymentFailedPage(
+          title: isCancelled ? 'Payment Cancelled' : 'Payment Failed',
+          message: message,
+          amount: total,
+          itemsCount: _itemsCount,
+          paymentMethodLabel: _paymentMethodLabel,
+          paymentId: paymentId,
+          address: _selectedAddress,
+          selectedItems: widget.selectedItems,
+          isCancelled: isCancelled,
+          onTryAgain: () => Navigator.of(context).pop(),
+          onBack: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+        ),
+      ),
+    );
+  }
+
+  void _onPaymentSuccess(PaymentSuccessResponse response) async {
+    final localOrderId = _pendingRazorpayData?['local_order_id'];
+    if (localOrderId == null) {
+      setState(() => _isPlacingOrder = false);
+      _goToFailedPage(
+        message: 'Missing order reference. Please contact support.',
+        isCancelled: false,
+      );
+      return;
+    }
+
+    final verifyResult = await ApiService.verifyRazorpayOrder(
+      localOrderId: int.tryParse(localOrderId.toString()) ?? 0,
+      razorpayOrderId: response.orderId ?? '',
+      razorpayPaymentId: response.paymentId ?? '',
+      razorpaySignature: response.signature ?? '',
+    );
+
+    if (!mounted) return;
+    setState(() => _isPlacingOrder = false);
+
+    if (verifyResult['success'] != true) {
+      _goToFailedPage(
+        message:
+            verifyResult['error']?.toString() ?? 'Payment verification failed',
+        isCancelled: false,
+        paymentId: response.paymentId,
+      );
+      return;
+    }
+
+    CartService().removeLocalProducts(
+      widget.selectedItems
+          .map<int?>((item) => item['product_id'] as int?)
+          .whereType<int>(),
+    );
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => PaymentSuccessPage(
+          title: 'Payment Successful',
+          subtitle: 'Successfully Paid',
+          amount: total,
+          itemPrice: subtotal,
+          deliveryFee: widget.deliveryFee,
+          discount: widget.promoApplied
+              ? (subtotal * widget.discountPercent / 100)
+              : 0.0,
+          itemsCount: _itemsCount,
+          paymentMethodLabel: _paymentMethodLabel,
+          paymentId: response.paymentId,
+          orderId: _pendingRazorpayData?['local_order_id']?.toString(),
+          address: _selectedAddress,
+          selectedItems: widget.selectedItems,
+          onContinueShopping: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _persistAddresses() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'saved_addresses_${widget.userId}',
+      jsonEncode(_savedAddresses),
+    );
   }
 
   List<String> get _stateOptions =>
@@ -242,12 +401,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return;
     }
     setState(() => _isSavingAddress = true);
-    if (!mounted) return;
+
     final newAddress = {
       'id': DateTime.now().millisecondsSinceEpoch,
       'address_type': _selectedAddressType,
       'first_name': _firstNameController.text.trim(),
       'last_name': _lastNameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
       'address_line_1': _addressLine1Controller.text.trim(),
       'address_line_2': _addressLine2Controller.text.trim(),
       'city': _cityController.text.trim(),
@@ -256,16 +417,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'country': _selectedCountry,
       'is_default': _savedAddresses.isEmpty,
     };
+
     setState(() {
       _savedAddresses.add(newAddress);
       _selectedAddressId = newAddress['id'] as int;
       _isSavingAddress = false;
       _showAddressForm = false;
     });
+    await _persistAddresses();
+
+    if (!mounted) return;
     showAppSnackBar(
       context,
       title: 'Success',
-      message: 'Address saved successfully',
+      message: 'Address saved',
       type: AppSnackBarType.success,
     );
     _clearForm();
@@ -274,6 +439,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void _clearForm() {
     _firstNameController.clear();
     _lastNameController.clear();
+    _emailController.clear();
+    _phoneController.clear();
     _addressLine1Controller.clear();
     _addressLine2Controller.clear();
     _cityController.clear();
@@ -329,24 +496,26 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ],
       ),
     );
-    if (confirm == true) {
-      if (!mounted) return;
-      setState(() {
-        _savedAddresses.removeWhere((address) => address['id'] == addressId);
-        if (_selectedAddressId == addressId) {
-          _selectedAddressId = _savedAddresses.isEmpty
-              ? null
-              : _savedAddresses.first['id'] as int;
-        }
-        _showAddressForm = _savedAddresses.isEmpty;
-      });
-      showAppSnackBar(
-        context,
-        title: 'Success',
-        message: 'Address deleted',
-        type: AppSnackBarType.success,
-      );
-    }
+    if (confirm != true) return;
+    if (!mounted) return;
+
+    setState(() {
+      _savedAddresses.removeWhere((address) => address['id'] == addressId);
+      if (_selectedAddressId == addressId) {
+        _selectedAddressId = _savedAddresses.isEmpty
+            ? null
+            : _savedAddresses.first['id'] as int;
+      }
+      _showAddressForm = _savedAddresses.isEmpty;
+    });
+    await _persistAddresses();
+
+    showAppSnackBar(
+      context,
+      title: 'Success',
+      message: 'Address deleted',
+      type: AppSnackBarType.success,
+    );
   }
 
   // ─── Build ───────────────────────────────────────────────────────────────
@@ -1044,6 +1213,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
           const SizedBox(height: 12),
           _buildTextField(
+            controller: _emailController,
+            label: 'Email',
+            hint: 'you@example.com',
+            validator: _emailValidator,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _phoneController,
+            label: 'Phone Number',
+            hint: '10-digit mobile number',
+            validator: _phoneValidator,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
             controller: _addressLine1Controller,
             label: 'Address Line 1',
             hint: 'Street address, P.O. box',
@@ -1257,6 +1440,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ],
       ),
     );
+  }
+
+  String? _emailValidator(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Email is required';
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!emailRegex.hasMatch(value.trim())) return 'Enter a valid email';
+    return null;
+  }
+
+  String? _phoneValidator(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Phone is required';
+    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length < 10) return 'Enter a valid phone number';
+    return null;
   }
 
   String? _requiredValidator(String? value) {

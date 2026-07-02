@@ -819,8 +819,6 @@ class ApiService {
     }
   }
 
-
-
   static Future<int> getCartCount(int userId) async {
     final cart = await getCart(userId);
     return cart.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
@@ -828,22 +826,43 @@ class ApiService {
 
   static Future<Map<String, dynamic>> checkoutCart({
     required int userId,
-    required List<int> productIds,
-    int? addressId,
-    Map<String, dynamic>? shippingAddress,
+    required List<Map<String, dynamic>> items,
     required String paymentMethod,
+    required Map<String, dynamic> address,
   }) async {
     try {
+      // Backend expects a comma-separated STRING of cart_item ids (not product ids)
+      final cartItemIds = items
+          .map((item) => item['cart_id'])
+          .where((id) => id != null)
+          .map((id) => id.toString())
+          .toList();
+
+      if (cartItemIds.isEmpty) {
+        return {
+          'success': false,
+          'error': 'Could not identify cart items for checkout.',
+        };
+      }
+
+      final line2 = (address['address_line_2']?.toString() ?? '').trim();
+      final combinedAddress = line2.isEmpty
+          ? address['address_line_1']
+          : '${address['address_line_1']}, $line2';
+
       final body = <String, dynamic>{
-        'user_id': userId,
-        'product_ids': productIds,
+        'items': cartItemIds.join(','),
+        'first_name': address['first_name'],
+        'last_name': address['last_name'],
+        'email': address['email'],
+        'phone': address['phone'],
+        'address': combinedAddress,
+        'city': address['city'],
+        'state': address['state'],
+        'postal_code': address['postal_code'],
+        'country': address['country'] ?? 'India',
         'payment_method': paymentMethod,
       };
-      if (addressId != null) {
-        body['address_id'] = addressId;
-      } else if (shippingAddress != null) {
-        body['shipping_address'] = shippingAddress;
-      }
       _log('Checkout body: ${jsonEncode(body)}');
       final response = await _postJson(
         '/user/orders/place',
@@ -869,32 +888,55 @@ class ApiService {
     required List<Map<String, dynamic>> items,
     required String paymentMethod,
     required double totalAmount,
-    Map<String, dynamic>? shippingAddress,
-    int? addressId,
+    required Map<String, dynamic> shippingAddress,
   }) {
     return checkoutCart(
       userId: userId,
-      productIds: items
-          .map<int?>((item) => int.tryParse(item['product_id'].toString()))
-          .whereType<int>()
-          .toList(),
-      addressId: addressId,
-      shippingAddress: shippingAddress,
+      items: items,
       paymentMethod: paymentMethod,
+      address: shippingAddress,
     );
   }
 
   static Future<Map<String, dynamic>> createRazorpayOrder({
-    required double amount,
-    String currency = 'INR',
-    Map<String, dynamic>? notes,
+    required List<Map<String, dynamic>> items,
+    required Map<String, dynamic> address,
   }) async {
     try {
-      final response = await _postJson('/razorpay/create-order', {
-        'amount': amount,
-        'currency': currency,
-        if (notes != null) 'notes': notes,
-      }, authenticated: true);
+      final cartItemIds = items
+          .map((item) => item['cart_id'])
+          .where((id) => id != null)
+          .map((id) => id.toString())
+          .toList();
+
+      if (cartItemIds.isEmpty) {
+        return {'success': false, 'error': 'Could not identify cart items.'};
+      }
+
+      final line2 = (address['address_line_2']?.toString() ?? '').trim();
+      final combinedAddress = line2.isEmpty
+          ? address['address_line_1']
+          : '${address['address_line_1']}, $line2';
+
+      final body = <String, dynamic>{
+        'items': cartItemIds.join(','),
+        'first_name': address['first_name'],
+        'last_name': address['last_name'],
+        'email': address['email'],
+        'phone': address['phone'],
+        'address': combinedAddress,
+        'city': address['city'],
+        'state': address['state'],
+        'postal_code': address['postal_code'],
+        'country': address['country'] ?? 'India',
+        'payment_method': 'razorpay',
+      };
+      _log('Razorpay create body: ${jsonEncode(body)}');
+      final response = await _postJson(
+        '/razorpay/create-order',
+        body,
+        authenticated: true,
+      );
       final data = _decodeBody(response);
       return _isSuccessStatus(response.statusCode)
           ? {'success': true, 'data': data}
@@ -909,12 +951,14 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> verifyRazorpayOrder({
+    required int localOrderId,
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
   }) async {
     try {
       final response = await _postJson('/razorpay/verify-order', {
+        'local_order_id': localOrderId,
         'razorpay_order_id': razorpayOrderId,
         'razorpay_payment_id': razorpayPaymentId,
         'razorpay_signature': razorpaySignature,
@@ -1118,11 +1162,16 @@ class ApiService {
     required Map<String, dynamic> addressData,
   }) async {
     try {
-      final response = await _postJson('/addresses/create/', {
-        'user_id': userId,
-        ...addressData,
-      });
-      if (response.statusCode == 201) {
+      final response = await _postJson(
+        '/addresses/create/',
+        {
+          // fix: correct path
+          'user_id': userId,
+          ...addressData,
+        },
+        authenticated: true,
+      ); // fix: add auth, since it's presumably a protected user action
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
       return {
