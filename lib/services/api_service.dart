@@ -933,7 +933,7 @@ class ApiService {
       };
       _log('Razorpay create body: ${jsonEncode(body)}');
       final response = await _postJson(
-        '/razorpay/create-order',
+        'user/orders/razorpay/create',
         body,
         authenticated: true,
       );
@@ -957,7 +957,7 @@ class ApiService {
     required String razorpaySignature,
   }) async {
     try {
-      final response = await _postJson('/razorpay/verify-order', {
+      final response = await _postJson('user/orders/razorpay/verify', {
         'local_order_id': localOrderId,
         'razorpay_order_id': razorpayOrderId,
         'razorpay_payment_id': razorpayPaymentId,

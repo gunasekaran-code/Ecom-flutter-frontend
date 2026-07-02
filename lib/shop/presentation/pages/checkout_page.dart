@@ -251,6 +251,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     };
 
     try {
+      print("Opening Razorpay with options:");
+      print(options);
       _razorpay.open(options);
     } catch (e) {
       setState(() => _isPlacingOrder = false);
