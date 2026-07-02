@@ -24,6 +24,7 @@ class _LoginPageState extends State<LoginPage>
   final GoogleAuthService _googleAuthService = GoogleAuthService();
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
+  bool _obscurePassword = true;
 
   bool isLoading = false;
 
@@ -244,7 +245,7 @@ class _LoginPageState extends State<LoginPage>
               Text(
                 strings.welcomeBack,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1A1A1A),
                 ),
@@ -253,7 +254,7 @@ class _LoginPageState extends State<LoginPage>
               Text(
                 strings.signInToContinue,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   color: Colors.black.withValues(alpha: 0.55),
                 ),
               ),
@@ -281,8 +282,24 @@ class _LoginPageState extends State<LoginPage>
                     GlassTextField(
                       hintText: strings.password,
                       icon: Icons.lock_outline,
-                      isPassword: true,
+                      isPassword:
+                          _obscurePassword, // Dynamic state instead of hardcoded true
                       controller: passwordController,
+                      // Add a trailing or suffixIcon property matching your GlassTextField implementation:
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color:
+                              kBrandRed, // Matches your red theme color style
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
                     ),
                   ],
                 ),

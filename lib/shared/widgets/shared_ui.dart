@@ -260,6 +260,7 @@ class GlassTextField extends StatelessWidget {
   final IconData icon;
   final bool isPassword;
   final TextEditingController? controller;
+  final Widget? suffixIcon;
 
   const GlassTextField({
     super.key,
@@ -267,17 +268,19 @@ class GlassTextField extends StatelessWidget {
     required this.icon,
     this.isPassword = false,
     this.controller,
+    this.suffixIcon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       obscureText: isPassword,
       style: const TextStyle(color: kTextDark),
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.black.withOpacity(0.45)),
+        suffixIcon: suffixIcon,
         prefixIcon: Icon(icon, color: kBrandRed),
         filled: true,
         fillColor: Colors.white.withOpacity(0.85),
