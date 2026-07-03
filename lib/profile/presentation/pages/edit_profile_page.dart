@@ -25,14 +25,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Uint8List? _selectedImageBytes;
   bool _isLoading = false;
 
-  String get _currentImageUrl =>
-      (_profileData['image_url'] ?? _profileData['photoUrl'])?.toString() ?? '';
+  String get _currentImageUrl {
+  final raw = (_profileData['profile_image'] ?? '').toString();
+  if (raw.isEmpty) return '';
+  if (raw.startsWith('http')) return raw;
+  return 'http://192.168.1.10:8000/$raw'; // or your ApiService.baseUrl constant
+}
 
   String get _initial {
     final name = _profileData['full_name'] ?? _profileData['name'] ?? '';
     final trimmed = name.toString().trim();
     return trimmed.isNotEmpty ? trimmed[0].toUpperCase() : 'U';
   }
+
+  String? _selectedGender;
+  static const List<String> _genderOptions = ['Male', 'Female', 'Other'];
 
   @override
   void initState() {
@@ -47,6 +54,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _phoneController = TextEditingController(
       text: _profileData['phone']?.toString() ?? '',
     );
+    _selectedGender = _profileData['gender']?.toString(); // ← add this
+    if (_selectedGender != null && _selectedGender!.isEmpty) {
+      _selectedGender = null;
+    }
     _loadUserData();
   }
 
@@ -63,6 +74,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _fullNameController.text = updatedUser['full_name']?.toString() ?? '';
         _emailController.text = updatedUser['email']?.toString() ?? '';
         _phoneController.text = updatedUser['phone']?.toString() ?? '';
+        _selectedGender = updatedUser['gender']?.toString();
+        if (_selectedGender != null && _selectedGender!.isEmpty) {
+          _selectedGender = null;
+        }
       });
     }
   }
@@ -241,9 +256,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     final result = await ApiService.updateUser(
       id: widget.userData['id'],
-      fullName: fullName,
+      name: fullName,
       email: email,
       phone: phone.isNotEmpty ? phone : null,
+      gender: _selectedGender,
       imageFile: _selectedImageFile,
     );
 
@@ -386,6 +402,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
                         ),
+                        const SizedBox(height: 16),
+                        _buildGenderDropdown(), // ← add this
                       ],
                     ),
                   ),
@@ -468,6 +486,67 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            color: kTextDark,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedGender,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: kTextMuted,
+          ),
+          style: const TextStyle(
+            color: kTextDark,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          dropdownColor: Colors.white,
+          decoration: InputDecoration(
+            hintText: 'Select gender',
+            hintStyle: const TextStyle(color: kTextMuted, fontSize: 14),
+            prefixIcon: const Icon(
+              Icons.wc_outlined,
+              color: kTextMuted,
+              size: 20,
+            ),
+            filled: true,
+            fillColor: kSurface,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kCardBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kCardBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBrandRed, width: 1.5),
+            ),
+          ),
+          items: _genderOptions
+              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+              .toList(),
+          onChanged: (value) => setState(() => _selectedGender = value),
+        ),
+      ],
     );
   }
 

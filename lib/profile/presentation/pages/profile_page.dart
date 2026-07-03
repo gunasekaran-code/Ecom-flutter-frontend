@@ -7,6 +7,8 @@ import 'package:wss_sports/services/wishlist_service.dart';
 import 'package:wss_sports/profile/presentation/pages/edit_profile_page.dart';
 import 'package:wss_sports/settings/presentation/pages/language_page.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_platform_interface/cached_network_image_platform_interface.dart';
 
 class ProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -29,9 +31,13 @@ class _ProfilePageState extends State<ProfilePage> {
       (_userData['full_name'] ?? _userData['name'] ?? 'User').toString();
   String get _email => (_userData['email'] ?? 'No email').toString();
   String get _phone => (_userData['phone'] ?? '+1 000 000 0000').toString();
+  String? get _gender => _userData['gender']?.toString();
   String get _languageLabel => _languageController.current.profileLabel;
   String? get _imageUrl =>
-      (_userData['image_url'] ?? _userData['photoUrl'])?.toString();
+      (_userData['profile_image'] ??
+              _userData['avatar'] ??
+              _userData['image_url'])
+          ?.toString();
   String get _initial =>
       _fullName.trim().isNotEmpty ? _fullName.trim()[0].toUpperCase() : 'U';
 
@@ -56,6 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _userData = updatedUser;
       });
     }
+    debugPrint('📦 ${runtimeType} userData: $_userData'); // ProfilePage
   }
 
   @override
@@ -209,19 +216,37 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: CircleAvatar(
                   radius: 48,
                   backgroundColor: Colors.white,
-                  backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
-                      ? NetworkImage(_imageUrl!)
-                      : null,
-                  child: _imageUrl == null || _imageUrl!.isEmpty
-                      ? Text(
-                          _initial,
-                          style: const TextStyle(
-                            fontSize: 36,
-                            color: kBrandRed,
-                            fontWeight: FontWeight.bold,
+                  child: ClipOval(
+                    child: _imageUrl != null && _imageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: _imageUrl!,
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                            imageRenderMethodForWeb:
+                                ImageRenderMethodForWeb.HtmlImage,
+                            placeholder: (context, url) =>
+                                const CircularProgressIndicator(strokeWidth: 2),
+                            errorWidget: (context, url, error) => Text(
+                              _initial,
+                              style: const TextStyle(
+                                fontSize: 36,
+                                color: kBrandRed,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              _initial,
+                              style: const TextStyle(
+                                fontSize: 36,
+                                color: kBrandRed,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        )
-                      : null,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -249,6 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ],
               ),
+
               if (_phone.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Row(
@@ -262,6 +288,27 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(width: 6),
                     Text(
                       _phone,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (_gender != null && _gender!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.wc_outlined,
+                      color: Colors.white70,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _gender!,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,

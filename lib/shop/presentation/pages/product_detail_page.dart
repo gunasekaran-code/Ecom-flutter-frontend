@@ -979,9 +979,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 5),
 
-                   // Price — animates when variation changes
+                  // Price — animates when variation changes
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
                     child: Text(
@@ -990,13 +990,41 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       style: const TextStyle(
                         color: kTextDark,
                         fontSize: 30,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -0.5,
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  
+
+                  // Stock — animates when variation changes
+                  Row(
+                    children: [
+                      Icon(
+                        _displayInStock
+                            ? Icons.check_circle
+                            : Icons.cancel_outlined,
+                        color: _displayInStock
+                            ? const Color(0xFF1DB954)
+                            : kBrandRed,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _displayInStock
+                            ? 'In Stock (${_displayStock} units)'
+                            : 'Out of Stock',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _displayInStock
+                              ? const Color(0xFF1DB954)
+                              : kBrandRed,
+                        ),
+                      ),
+                    ],
+                  ),
+                   const SizedBox(height: 15),
 
                   // ── Rating — now a tappable button that opens the
                   // "Ratings and reviews" popup. ────────────────────
@@ -1037,7 +1065,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
 
                   // ── Variation Selector ────────────────────────────
                   _buildVariationSelector(),

@@ -892,10 +892,10 @@ class _ProductCardState extends State<ProductCard> {
                             const SizedBox(width: 2),
                             // 1. We wrap the debugPrint statement in an inline block execution
                             (() {
-                              debugPrint('🔍 full product: ${widget.product}');
-                              debugPrint(
-                                '🔍 product ratings: ${widget.product['average_rating']} / ${widget.product['rating']} / ${widget.product['avg_rating']}',
-                              );
+                              // debugPrint('🔍 full product: ${widget.product}');
+                              // debugPrint(
+                              //   '🔍 product ratings: ${widget.product['average_rating']} / ${widget.product['rating']} / ${widget.product['avg_rating']}',
+                              // );
                               return const SizedBox.shrink(); // Returns an invisible widget that takes 0 space
                             })(),
                             Text(

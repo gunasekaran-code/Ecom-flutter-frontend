@@ -394,98 +394,110 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>?> getUser({required int id}) async {
-    try {
-      _log('Fetching user ID: $id');
-      final response = await _getJson('/user', authenticated: true);
-      _log('Get user: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data is Map<String, dynamic> ? data : null;
-      }
-      _logError('Get user failed: ${response.statusCode} ${response.body}');
-      return null;
-    } catch (e) {
-      _logError('Error fetching user: $e');
-      return null;
-    }
-  }
+  static Map<String, dynamic> _normalizeUser(Map<String, dynamic> user) {
+  return {
+    ...user,
+    'id': user['id'],
+    'full_name': user['name']?.toString() ?? user['full_name']?.toString(),
+    'email': user['email']?.toString(),
+    'phone': user['phone_number']?.toString() ?? user['phone']?.toString(),
+    'gender': user['gender']?.toString(),
+    'image_url': _absoluteAssetUrl(
+      user['profile_image']?.toString() ?? user['image_url']?.toString(),
+    ),
+  };
+}
 
+ static Future<Map<String, dynamic>?> getUser({int? id}) async {
+  try {
+    _log('Fetching profile');
+    final response = await _getJson('/user/profile', authenticated: true);
+    _log('Get profile: ${response.statusCode} — ${response.body}');
+    if (response.statusCode == 200) {
+      final decoded = _decodeBody(response);
+      final user = decoded is Map<String, dynamic> ? decoded['user'] : null;
+      if (user is Map<String, dynamic>) {
+        return _normalizeUser(Map<String, dynamic>.from(user));
+      }
+    }
+    _logError('Get profile failed: ${response.statusCode} ${response.body}');
+    return null;
+  } catch (e) {
+    _logError('Error fetching profile: $e');
+    return null;
+  }
+}
   static Future<Map<String, dynamic>> updateUser({
-    required int id,
-    String? fullName,
+    int? id,
+    String? name,
     String? email,
     String? phone,
+    String? gender,
     XFile? imageFile,
   }) async {
     try {
-      _log('Updating user ID: $id');
+      _log('Updating profile');
       final request = http.MultipartRequest(
-        'PATCH',
-        Uri.parse('$baseUrl/user/partial'),
+        'POST', // Laravel route is Route::post('profile/update', ...)
+        Uri.parse('$baseUrl/user/profile/update'),
       );
-      if (fullName != null) request.fields['full_name'] = fullName;
+
+      final headers = await _authHeaders();
+      headers.remove(
+        'Content-Type',
+      ); // let MultipartRequest set its own boundary
+      request.headers.addAll(headers);
+
+      if (name != null) request.fields['name'] = name;
       if (email != null) request.fields['email'] = email;
-      if (phone != null) request.fields['phone'] = phone;
+      if (phone != null) request.fields['phone_number'] = phone;
+      if (gender != null && gender.isNotEmpty)
+        request.fields['gender'] = gender;
+
       if (imageFile != null) {
         final bytes = await imageFile.readAsBytes();
         request.files.add(
           http.MultipartFile.fromBytes(
-            'image',
+            'profile_image', // must match Laravel's validated field name
             bytes,
             filename: imageFile.name,
           ),
         );
       }
+
       final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      _log('Update user: ${response.statusCode}');
+      final responseBody = await response.stream.bytesToString();
+      _log('Update profile: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(responseData)};
+        final decoded = jsonDecode(responseBody);
+        final user = decoded is Map<String, dynamic> ? decoded['user'] : null;
+        if (user is Map<String, dynamic>) {
+          return {
+            'success': true,
+            'data': _normalizeUser(Map<String, dynamic>.from(user)),
+          };
+        }
+        return {'success': false, 'error': 'Unexpected response format'};
       }
-      return {
-        'success': false,
-        'error': 'HTTP ${response.statusCode}: $responseData',
-      };
+
+      try {
+        final decoded = jsonDecode(responseBody);
+        return {
+          'success': false,
+          'error': _errorMessage(decoded, 'HTTP ${response.statusCode}'),
+        };
+      } catch (_) {
+        return {
+          'success': false,
+          'error': 'HTTP ${response.statusCode}: $responseBody',
+        };
+      }
     } catch (e) {
-      _logError('Error updating user: $e');
+      _logError('Error updating profile: $e');
       return {'success': false, 'error': 'Network error: $e'};
     }
   }
-
-  // ─────────────────────────────────────────────
-  //  PRODUCT APIs
-  // ─────────────────────────────────────────────
-
-  /// Fetch all products, optionally filtered by [category].
-  // static Future<List<Map<String, dynamic>>> getProducts({
-  //   String? category,
-  // }) async {
-  //   try {
-  //     final response = await _getJson(
-  //       '/user/products/',
-  //       queryParams: (category != null && category.isNotEmpty)
-  //           ? {'category': category}
-  //           : null,
-  //     );
-  //     _log('Products: ${response.statusCode}');
-  //     if (response.statusCode == 200) {
-  //       final decoded = jsonDecode(response.body);
-  //       final data = decoded is List
-  //           ? decoded
-  //           : decoded is Map<String, dynamic> && decoded['results'] is List
-  //           ? decoded['results'] as List
-  //           : const <dynamic>[];
-  //       _log('Retrieved ${data.length} products');
-  //       return data.whereType<Map<String, dynamic>>().toList();
-  //     }
-  //     _logError('Failed to fetch products: ${response.statusCode}');
-  //     return [];
-  //   } catch (e) {
-  //     _logError('Error fetching products: $e');
-  //     return [];
-  //   }
-  // }
 
   static String? _colorNameToHex(String label) {
     final key = label.trim().toLowerCase();
@@ -819,6 +831,10 @@ class ApiService {
     }
   }
 
+  // ─────────────────────────────────────────────
+  //  Orders APIs
+  // ─────────────────────────────────────────────
+
   static Future<int> getCartCount(int userId) async {
     final cart = await getCart(userId);
     return cart.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
@@ -1142,7 +1158,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
     try {
       final response = await _getJson(
-        '/addresses/',
+        'user/addresses/',
         queryParams: {'user_id': userId.toString()},
       );
       if (response.statusCode == 200) {
