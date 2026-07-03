@@ -522,62 +522,63 @@ class ApiService {
     return map[key];
   }
 
- static Future<List<Map<String, dynamic>>> getProducts({
-  String? category,
-}) async {
-  try {
-    final response = await _getJson(
-      '/user/products/',
-      queryParams: (category != null && category.isNotEmpty)
-          ? {'category': category}
-          : null,
-    );
-    _log('Products: ${response.statusCode}');
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final data = _listFromDecoded(decoded, [
-        'data',
-        'results',
-        'products',
-        'items',
-      ]);
-      _log('Retrieved ${data.length} products');
+  static Future<List<Map<String, dynamic>>> getProducts({
+    String? category,
+  }) async {
+    try {
+      final response = await _getJson(
+        '/user/products/',
+        queryParams: (category != null && category.isNotEmpty)
+            ? {'category': category}
+            : null,
+      );
+      _log('Products: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final data = _listFromDecoded(decoded, [
+          'data',
+          'results',
+          'products',
+          'items',
+        ]);
+        _log('Retrieved ${data.length} products');
 
-      final products = data
-          .whereType<Map<String, dynamic>>()
-          .map(_normalizeProduct)
-          .toList();
+        final products = data
+            .whereType<Map<String, dynamic>>()
+            .map(_normalizeProduct)
+            .toList();
 
-      // ── Workaround: list endpoint has no rating data, so fetch it
-      // per-product from the detail endpoint and merge it in. ──
-      await Future.wait(products.map((product) async {
-        final id = int.tryParse(product['id']?.toString() ?? '');
-        if (id == null || id <= 0) return;
-        try {
-          final detail = await getProductDetail(id);
-          if (detail != null) {
-            if (detail['average_rating'] != null) {
-              product['average_rating'] = detail['average_rating'];
+        // ── Workaround: list endpoint has no rating data, so fetch it
+        // per-product from the detail endpoint and merge it in. ──
+        await Future.wait(
+          products.map((product) async {
+            final id = int.tryParse(product['id']?.toString() ?? '');
+            if (id == null || id <= 0) return;
+            try {
+              final detail = await getProductDetail(id);
+              if (detail != null) {
+                if (detail['average_rating'] != null) {
+                  product['average_rating'] = detail['average_rating'];
+                }
+                if (detail['total_reviews'] != null) {
+                  product['total_reviews'] = detail['total_reviews'];
+                }
+              }
+            } catch (e) {
+              _logError('Rating fetch failed for product $id: $e');
             }
-            if (detail['total_reviews'] != null) {
-              product['total_reviews'] = detail['total_reviews'];
-            }
-          }
-        } catch (e) {
-          _logError('Rating fetch failed for product $id: $e');
-        }
-      }));
+          }),
+        );
 
-      return products;
+        return products;
+      }
+      _logError('Failed to fetch products: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      _logError('Error fetching products: $e');
+      return [];
     }
-    _logError('Failed to fetch products: ${response.statusCode}');
-    return [];
-  } catch (e) {
-    _logError('Error fetching products: $e');
-    return [];
   }
-}
-
 
   /// Fetch a single product by [id].
   static Future<Map<String, dynamic>?> getProductDetail(int id) async {
@@ -1274,5 +1275,161 @@ class ApiService {
       _logError('Error fetching exchange rate: $e');
     }
     return 83.0;
+  }
+
+  // ─────────────────────────────────────────────
+  //  Order Status METHODS
+  // ─────────────────────────────────────────────
+
+  static final StreamController<void> orderEvents =
+      StreamController<void>.broadcast();
+
+  static void _notifyOrdersChanged() => orderEvents.add(null);
+
+  // ── Normalize one order JSON object from the DB into flat keys the
+  // Flutter OrderModel expects. Adjust the key lists below if your
+  // controller's json() / resource output uses different names. ──
+  static Map<String, dynamic> _normalizeOrder(Map<String, dynamic> order) {
+    final n = Map<String, dynamic>.from(order);
+
+    n['status'] ??= _firstStringValue(n, ['order_status', 'status']);
+    n['payment_method'] ??= _firstStringValue(n, ['payment_method']);
+    n['total_amount'] ??= _firstStringValue(n, [
+      'total',
+      'total_amount',
+      'grand_total',
+    ]);
+    n['total_items'] ??=
+        n['total_items'] ??
+        n['items_count'] ??
+        (n['items'] is List
+            ? (n['items'] as List).length
+            : (n['order_items'] is List
+                  ? (n['order_items'] as List).length
+                  : 0));
+    n['tracking_number'] ??= _firstStringValue(n, [
+      'order_code',
+      'tracking_number',
+    ]);
+    n['created_at'] ??= _firstStringValue(n, ['created_at']);
+
+    // Address may come flat on the order OR nested under an `address`
+    // relation (since your table stores address_id).
+    final addr = n['address'];
+    final addrMap = addr is Map<String, dynamic> ? addr : <String, dynamic>{};
+    n['first_name'] ??=
+        _firstStringValue(n, ['first_name']) ??
+        _firstStringValue(addrMap, ['first_name']);
+    n['last_name'] ??=
+        _firstStringValue(n, ['last_name']) ??
+        _firstStringValue(addrMap, ['last_name']);
+    n['address_line_1'] ??=
+        _firstStringValue(n, ['address_line_1', 'address']) ??
+        _firstStringValue(addrMap, ['address_line_1', 'address']);
+    n['address_line_2'] ??=
+        _firstStringValue(n, ['address_line_2']) ??
+        _firstStringValue(addrMap, ['address_line_2']);
+    n['city'] ??=
+        _firstStringValue(n, ['city']) ?? _firstStringValue(addrMap, ['city']);
+    n['state'] ??=
+        _firstStringValue(n, ['state']) ??
+        _firstStringValue(addrMap, ['state']);
+    n['postal_code'] ??=
+        _firstStringValue(n, ['postal_code']) ??
+        _firstStringValue(addrMap, ['postal_code']);
+    n['country'] ??=
+        _firstStringValue(n, ['country']) ??
+        _firstStringValue(addrMap, ['country']);
+
+    // Items: your relation might be called `items` or `order_items`,
+    // and each row might nest the product under `product`.
+    final rawItems = n['items'] ?? n['order_items'] ?? [];
+    if (rawItems is List) {
+      n['items'] = rawItems.map((raw) {
+        if (raw is! Map<String, dynamic>) return raw;
+        final item = Map<String, dynamic>.from(raw);
+        final product = item['product'];
+        final productMap = product is Map<String, dynamic>
+            ? product
+            : <String, dynamic>{};
+
+        item['product_name'] ??=
+            _firstStringValue(item, ['product_name', 'name']) ??
+            _firstStringValue(productMap, ['product_name', 'name']);
+        item['product_price'] ??=
+            _firstStringValue(item, ['product_price', 'price', 'unit_price']) ??
+            _firstStringValue(productMap, ['price', 'selling_price']);
+        item['quantity'] ??= item['quantity'] ?? item['qty'] ?? 1;
+        final image =
+            _firstStringValue(item, ['image_url', 'image']) ??
+            _firstStringValue(productMap, ['image_url', 'image']);
+        item['image_url'] = _absoluteAssetUrl(image);
+        return item;
+      }).toList();
+    }
+
+    return n;
+  }
+
+  /// Fetch the logged-in user's orders from the database.
+  static Future<List<Map<String, dynamic>>> getOrders() async {
+    try {
+      _log('Fetching orders');
+      final response = await _getJson('/user/orders/', authenticated: true);
+      _log('Orders: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final decoded = _decodeBody(response);
+        final list = _listFromDecoded(decoded, [
+          'data',
+          'orders',
+          'results',
+          'items',
+        ]);
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(_normalizeOrder)
+            .toList();
+      }
+      _logError('Get orders failed: ${response.statusCode} ${response.body}');
+      return [];
+    } catch (e) {
+      _logError('Error fetching orders: $e');
+      return [];
+    }
+  }
+
+  /// Cancel an order in the database.
+  static Future<bool> cancelOrderRequest(int orderId) async {
+    try {
+      final response = await _postJson(
+        '/user/orders/$orderId/cancel',
+        {},
+        authenticated: true,
+      );
+      final ok = _isSuccessStatus(response.statusCode);
+      if (ok) _notifyOrdersChanged();
+      return ok;
+    } catch (e) {
+      _logError('Error cancelling order: $e');
+      return false;
+    }
+  }
+
+  /// Mark an order delivered in the database (usually an admin/courier
+  /// action — keep only if your backend actually exposes this to users).
+  static Future<bool> deliverOrderRequest(int orderId) async {
+    try {
+      final response = await _postJson(
+        '/user/orders/$orderId/deliver',
+        {},
+        authenticated: true,
+      );
+      final ok = _isSuccessStatus(response.statusCode);
+      if (ok) _notifyOrdersChanged();
+      return ok;
+    } catch (e) {
+      _logError('Error marking order delivered: $e');
+      return false;
+    }
   }
 }

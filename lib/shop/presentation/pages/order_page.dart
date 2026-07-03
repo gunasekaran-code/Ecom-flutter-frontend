@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:wss_sports/services/order_service.dart';
+import 'package:wss_sports/services/api_service.dart';
+import 'package:wss_sports/shared/widgets/shared_ui.dart';
 
-// ── Models ────────────────────────────────────────────────────────────────────
+// ── Models ───────────────────────────────────────────────────────────────
 class OrderItemModel {
   final int id;
   final String productName;
@@ -20,11 +20,11 @@ class OrderItemModel {
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> j) => OrderItemModel(
-    id: j['id'],
-    productName: j['product_name'] ?? '',
-    productPrice: double.tryParse(j['product_price'].toString()) ?? 0,
-    quantity: j['quantity'] ?? 1,
-    imageUrl: j['image_url'],
+    id: int.tryParse(j['id']?.toString() ?? '') ?? 0,
+    productName: j['product_name']?.toString() ?? '',
+    productPrice: double.tryParse(j['product_price']?.toString() ?? '') ?? 0,
+    quantity: int.tryParse(j['quantity']?.toString() ?? '') ?? 1,
+    imageUrl: j['image_url']?.toString(),
   );
 }
 
@@ -65,50 +65,50 @@ class OrderModel {
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> j) => OrderModel(
-    id: j['id'],
-    status: j['status'] ?? 'placed',
-    paymentMethod: j['payment_method'] ?? 'cod',
-    totalAmount: double.tryParse(j['total_amount'].toString()) ?? 0,
-    totalItems: j['total_items'] ?? 0,
-    firstName: j['first_name'] ?? '',
-    lastName: j['last_name'] ?? '',
-    addressLine1: j['address_line_1'] ?? '',
-    addressLine2: j['address_line_2'] ?? '',
-    city: j['city'] ?? '',
-    state: j['state'] ?? '',
-    postalCode: j['postal_code'] ?? '',
-    country: j['country'] ?? '',
-    trackingNumber: j['tracking_number'] ?? '',
-    currentLocation: j['current_location'] ?? '',
-    estimatedDelivery: j['estimated_delivery'],
-    createdAt: j['created_at'] ?? '',
+    id: int.tryParse(j['id']?.toString() ?? '') ?? 0,
+    status: (j['status'] ?? j['order_status'] ?? 'pending').toString(),
+    paymentMethod: (j['payment_method'] ?? 'cod').toString(),
+    totalAmount: double.tryParse(j['total_amount']?.toString() ?? '') ?? 0,
+    totalItems: int.tryParse(j['total_items']?.toString() ?? '') ?? 0,
+    firstName: j['first_name']?.toString() ?? '',
+    lastName: j['last_name']?.toString() ?? '',
+    addressLine1: j['address_line_1']?.toString() ?? '',
+    addressLine2: j['address_line_2']?.toString() ?? '',
+    city: j['city']?.toString() ?? '',
+    state: j['state']?.toString() ?? '',
+    postalCode: j['postal_code']?.toString() ?? '',
+    country: j['country']?.toString() ?? '',
+    trackingNumber: j['tracking_number']?.toString() ?? '',
+    currentLocation: j['current_location']?.toString() ?? '',
+    estimatedDelivery: j['estimated_delivery']?.toString(),
+    createdAt: j['created_at']?.toString() ?? '',
     items: (j['items'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
         .map((e) => OrderItemModel.fromJson(e))
         .toList(),
   );
 
-  bool get canCancel => status == 'placed' || status == 'confirmed';
+  // Treat DB's default "pending" the same as your old "placed".
+  bool get canCancel =>
+      status == 'pending' || status == 'placed' || status == 'confirmed';
 
-  bool get isPending => paymentMethod == 'cod' && status == 'placed';
+  bool get isPending => paymentMethod == 'cod' && canCancel;
 
-  bool get isApproved => paymentMethod == 'upi' && status != 'cancelled';
+  bool get isApproved => paymentMethod != 'cod' && status != 'cancelled';
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
+// ── API ──────────────────────────────────────────────────────────────────
 Future<List<OrderModel>> fetchOrders(int userId) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-  return OrderService()
-      .ordersForUser(userId)
-      .map((order) => OrderModel.fromJson(order))
-      .toList();
+  final raw = await ApiService.getOrders();
+  return raw.map((order) => OrderModel.fromJson(order)).toList();
 }
 
-Future<bool> cancelOrder(int orderId, int userId) async {
-  return OrderService().cancelOrder(orderId, userId);
+Future<bool> cancelOrder(int orderId, int userId) {
+  return ApiService.cancelOrderRequest(orderId);
 }
 
-Future<bool> deliverOrder(int orderId, int userId) async {
-  return OrderService().deliverOrder(orderId, userId);
+Future<bool> deliverOrder(int orderId, int userId) {
+  return ApiService.deliverOrderRequest(orderId);
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -131,9 +131,9 @@ class _OrderPageState extends State<OrderPage>
     super.initState();
     _tab = TabController(length: 3, vsync: this);
     _future = fetchOrders(widget.userId);
-    _orderSubscription = OrderService().orderChangeStream.listen((event) {
-      if (!mounted) return;
-      _load();
+    _orderSubscription = ApiService.orderEvents.stream.listen((event) {
+    if (!mounted) return;
+    _load();
     });
   }
 
@@ -876,7 +876,7 @@ class _ItemRow extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer, 
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                       errorBuilder: (context, error, stackTrace) =>
                           _placeholder(),
                     )
