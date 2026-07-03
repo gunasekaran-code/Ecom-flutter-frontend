@@ -62,7 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _userData = updatedUser;
       });
     }
-    debugPrint('📦 ${runtimeType} userData: $_userData'); // ProfilePage
+    // debugPrint('📦 ${runtimeType} userData: $_userData'); // ProfilePage
   }
 
   @override

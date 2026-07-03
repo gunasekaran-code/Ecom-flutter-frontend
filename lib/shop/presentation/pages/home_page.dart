@@ -911,15 +911,8 @@ class _ProductCardState extends State<ProductCard> {
                               size: 14,
                             ),
                             const SizedBox(width: 2),
-                            // If you need the total reviews or a dot separator, you can handle it inside this function,
-                            // but leaving it as SizedBox.shrink() for now to preserve your exact layout.
-                            (() {
-                              return const SizedBox.shrink();
-                            })(),
                             Text(
-                              ReviewData.averageRating(
-                                widget.product,
-                              ).toStringAsFixed(1), // Added bang operator (!) if widget.product is nullable
+                              ReviewData.averageRating(widget.product).toStringAsFixed(1),
                               style: const TextStyle(
                                 color: kTextMuted,
                                 fontSize: 12,

@@ -8,7 +8,15 @@ class ReviewData {
   static double averageRating(Map<String, dynamic> product) {
     final v = double.tryParse(product['average_rating']?.toString() ?? '');
     if (v != null) return v;
-    return ProductData.rating(product);
+
+    final productRating = ProductData.rating(product);
+    if (productRating > 0) return productRating;
+
+    final reviews = reviewsOf(product);
+    if (reviews.isEmpty) return 0;
+
+    final sum = reviews.fold<double>(0, (s, r) => s + rating(r));
+    return sum / reviews.length;
   }
 
   static int totalReviews(Map<String, dynamic> product) {
@@ -74,9 +82,7 @@ class ReviewData {
       int.tryParse(r['id']?.toString() ?? '') ?? 0;
 
   static double rating(Map<String, dynamic> r) =>
-      double.tryParse(
-        r['rating']?.toString() ?? r['star']?.toString() ?? '',
-      ) ??
+      double.tryParse(r['rating']?.toString() ?? r['star']?.toString() ?? '') ??
       0;
 
   static String title(Map<String, dynamic> r) =>

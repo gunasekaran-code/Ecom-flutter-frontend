@@ -395,38 +395,39 @@ class ApiService {
   }
 
   static Map<String, dynamic> _normalizeUser(Map<String, dynamic> user) {
-  return {
-    ...user,
-    'id': user['id'],
-    'full_name': user['name']?.toString() ?? user['full_name']?.toString(),
-    'email': user['email']?.toString(),
-    'phone': user['phone_number']?.toString() ?? user['phone']?.toString(),
-    'gender': user['gender']?.toString(),
-    'image_url': _absoluteAssetUrl(
-      user['profile_image']?.toString() ?? user['image_url']?.toString(),
-    ),
-  };
-}
-
- static Future<Map<String, dynamic>?> getUser({int? id}) async {
-  try {
-    _log('Fetching profile');
-    final response = await _getJson('/user/profile', authenticated: true);
-    _log('Get profile: ${response.statusCode} — ${response.body}');
-    if (response.statusCode == 200) {
-      final decoded = _decodeBody(response);
-      final user = decoded is Map<String, dynamic> ? decoded['user'] : null;
-      if (user is Map<String, dynamic>) {
-        return _normalizeUser(Map<String, dynamic>.from(user));
-      }
-    }
-    _logError('Get profile failed: ${response.statusCode} ${response.body}');
-    return null;
-  } catch (e) {
-    _logError('Error fetching profile: $e');
-    return null;
+    return {
+      ...user,
+      'id': user['id'],
+      'full_name': user['name']?.toString() ?? user['full_name']?.toString(),
+      'email': user['email']?.toString(),
+      'phone': user['phone_number']?.toString() ?? user['phone']?.toString(),
+      'gender': user['gender']?.toString(),
+      'image_url': _absoluteAssetUrl(
+        user['profile_image']?.toString() ?? user['image_url']?.toString(),
+      ),
+    };
   }
-}
+
+  static Future<Map<String, dynamic>?> getUser({int? id}) async {
+    try {
+      _log('Fetching profile');
+      final response = await _getJson('/user/profile', authenticated: true);
+      _log('Get profile: ${response.statusCode} — ${response.body}');
+      if (response.statusCode == 200) {
+        final decoded = _decodeBody(response);
+        final user = decoded is Map<String, dynamic> ? decoded['user'] : null;
+        if (user is Map<String, dynamic>) {
+          return _normalizeUser(Map<String, dynamic>.from(user));
+        }
+      }
+      _logError('Get profile failed: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      _logError('Error fetching profile: $e');
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> updateUser({
     int? id,
     String? name,
@@ -521,38 +522,62 @@ class ApiService {
     return map[key];
   }
 
-  static Future<List<Map<String, dynamic>>> getProducts({
-    String? category,
-  }) async {
-    try {
-      final response = await _getJson(
-        '/user/products/',
-        queryParams: (category != null && category.isNotEmpty)
-            ? {'category': category}
-            : null,
-      );
-      _log('Products: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        final data = _listFromDecoded(decoded, [
-          'data',
-          'results',
-          'products',
-          'items',
-        ]);
-        _log('Retrieved ${data.length} products');
-        return data
-            .whereType<Map<String, dynamic>>()
-            .map(_normalizeProduct)
-            .toList();
-      }
-      _logError('Failed to fetch products: ${response.statusCode}');
-      return [];
-    } catch (e) {
-      _logError('Error fetching products: $e');
-      return [];
+ static Future<List<Map<String, dynamic>>> getProducts({
+  String? category,
+}) async {
+  try {
+    final response = await _getJson(
+      '/user/products/',
+      queryParams: (category != null && category.isNotEmpty)
+          ? {'category': category}
+          : null,
+    );
+    _log('Products: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final data = _listFromDecoded(decoded, [
+        'data',
+        'results',
+        'products',
+        'items',
+      ]);
+      _log('Retrieved ${data.length} products');
+
+      final products = data
+          .whereType<Map<String, dynamic>>()
+          .map(_normalizeProduct)
+          .toList();
+
+      // ── Workaround: list endpoint has no rating data, so fetch it
+      // per-product from the detail endpoint and merge it in. ──
+      await Future.wait(products.map((product) async {
+        final id = int.tryParse(product['id']?.toString() ?? '');
+        if (id == null || id <= 0) return;
+        try {
+          final detail = await getProductDetail(id);
+          if (detail != null) {
+            if (detail['average_rating'] != null) {
+              product['average_rating'] = detail['average_rating'];
+            }
+            if (detail['total_reviews'] != null) {
+              product['total_reviews'] = detail['total_reviews'];
+            }
+          }
+        } catch (e) {
+          _logError('Rating fetch failed for product $id: $e');
+        }
+      }));
+
+      return products;
     }
+    _logError('Failed to fetch products: ${response.statusCode}');
+    return [];
+  } catch (e) {
+    _logError('Error fetching products: $e');
+    return [];
   }
+}
+
 
   /// Fetch a single product by [id].
   static Future<Map<String, dynamic>?> getProductDetail(int id) async {
@@ -650,6 +675,17 @@ class ApiService {
             return v;
           }).toList();
         }
+
+        // ── Re-apply rating/review fields that _normalizeProduct may not know about ──
+        for (final key in [
+          'average_rating',
+          'total_reviews',
+          'reviews',
+          'rating_breakdown',
+        ]) {
+          if (data.containsKey(key)) normalized[key] = data[key];
+        }
+
         return normalized;
       }
 

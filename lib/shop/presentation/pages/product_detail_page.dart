@@ -91,7 +91,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final freshDetail = await freshDetailFuture;
     await relatedFuture;
     if (!mounted) return;
-
+    debugPrint('PRODUCT DETAIL KEYS: ${freshDetail?.keys}');
+    debugPrint('PRODUCT DETAIL RAW: $freshDetail');
     setState(() {
       // Prefer the fresh detail (has variations); fall back to initialProduct if the fetch failed.
       product = freshDetail ?? widget.initialProduct ?? product;
@@ -729,6 +730,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                           fontSize: 11,
                                         ),
                                       ),
+                                      Text(
+                                        ReviewData.averageRating(
+                                          p,
+                                        ).toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          color: kTextMuted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -1024,7 +1034,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       ),
                     ],
                   ),
-                   const SizedBox(height: 15),
+                  const SizedBox(height: 15),
 
                   // ── Rating — now a tappable button that opens the
                   // "Ratings and reviews" popup. ────────────────────
