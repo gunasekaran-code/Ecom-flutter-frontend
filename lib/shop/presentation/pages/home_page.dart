@@ -241,7 +241,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   Text(
                     strings.welcomeUser(
-                      widget.userData['full_name']?.toString() ?? '',
+                      widget.userData['name']?.toString() ?? '',
                     ),
                     style: const TextStyle(fontSize: 13, color: kTextMuted),
                   ),

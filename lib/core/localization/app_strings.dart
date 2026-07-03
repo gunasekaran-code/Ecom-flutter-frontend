@@ -165,7 +165,7 @@ const Map<String, Map<String, String>> _localizedValues = {
     'confirmPasswordHint': 'Confirm Password',
     'registerUppercase': 'REGISTER',
     'alreadyHaveAccount': 'Already have an account? ',
-    'discover': 'Discover',
+    'discover': 'Discover ',
     'welcomeUser': 'Welcome, {name}',
     'searchProducts': 'Search products...',
     'categories': 'Categories',
