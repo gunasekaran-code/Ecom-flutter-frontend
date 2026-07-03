@@ -1,34 +1,5 @@
 import 'package:wss_sports/utils/product_data.dart';
 
-/// Helpers for parsing rating & review data returned by the product
-/// detail API (GET /user/products/{id}).
-///
-/// Assumed shape — adjust the key names below if your backend differs:
-/// {
-///   ...product fields...
-///   "average_rating": 4.5,
-///   "total_reviews": 2415,
-///   "rating_breakdown": { "5": 1727, "4": 469, "3": 103, "2": 36, "1": 80 }, // optional
-///   "reviews": [
-///     {
-///       "id": 1,
-///       "rating": 4,
-///       "title": "Good quality product",
-///       "comment": "With the 2.4Gz wifi dongle...",
-///       "reviewer_name": "Shyamo Kalyani",
-///       "is_verified": true,
-///       "created_at": "2025-04-12",
-///       "variation": "Color White",
-///       "helpful_count": 27,
-///       "not_helpful_count": 4,
-///       "images": ["reviews/1.jpg", "reviews/2.jpg"]
-///     }
-///   ]
-/// }
-///
-/// If `rating_breakdown` is missing, it's computed locally from the
-/// `reviews` list. If `average_rating` / `total_reviews` are missing,
-/// they fall back to ProductData.rating() and reviews.length.
 class ReviewData {
   ReviewData._();
 

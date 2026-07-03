@@ -66,6 +66,18 @@ class _HomePageState extends State<HomePage> {
     return category['name']?.toString().trim() ?? '';
   }
 
+  void _onCategoryTap(Map<String, dynamic> category) {
+    final categoryQueryValue = _categoryQueryValue(category);
+
+    // Block taps on placeholder categories before real IDs load from the API
+    if (categoryQueryValue != 'all' && category['id'] == null) {
+      return;
+    }
+
+    setState(() => selectedCategory = categoryQueryValue);
+    fetchProducts();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,13 +145,28 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  bool _matchesSelectedCategory(Map<String, dynamic> product) {
+    if (selectedCategory == 'all' || selectedCategory.isEmpty) return true;
+
+    // Check every plausible field/shape the backend might send for category id
+    final rawCategoryId =
+        product['category_id'] ??
+        product['categoryId'] ??
+        (product['category'] is Map
+            ? (product['category'] as Map)['id']
+            : null);
+
+    return rawCategoryId?.toString() == selectedCategory;
+  }
+
   void _applyFilters() {
     filteredProducts = products.where((product) {
       final matchesSearch =
           _searchQuery.isEmpty ||
           ProductData.name(product).toLowerCase().contains(_searchQuery) ||
           ProductData.description(product).toLowerCase().contains(_searchQuery);
-      return matchesSearch;
+      final matchesCategory = _matchesSelectedCategory(product);
+      return matchesSearch && matchesCategory;
     }).toList();
   }
 
@@ -467,13 +494,7 @@ class _HomePageState extends State<HomePage> {
                                 color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
                                 child: InkWell(
-                                  onTap: () {
-                                    setState(
-                                      () =>
-                                          selectedCategory = categoryQueryValue,
-                                    );
-                                    fetchProducts();
-                                  },
+                                  onTap: () => _onCategoryTap(category),
                                   splashColor: kBrandRed.withOpacity(0.3),
                                   highlightColor: kBrandRed.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(20),
@@ -890,18 +911,15 @@ class _ProductCardState extends State<ProductCard> {
                               size: 14,
                             ),
                             const SizedBox(width: 2),
-                            // 1. We wrap the debugPrint statement in an inline block execution
+                            // If you need the total reviews or a dot separator, you can handle it inside this function,
+                            // but leaving it as SizedBox.shrink() for now to preserve your exact layout.
                             (() {
-                              // debugPrint('🔍 full product: ${widget.product}');
-                              // debugPrint(
-                              //   '🔍 product ratings: ${widget.product['average_rating']} / ${widget.product['rating']} / ${widget.product['avg_rating']}',
-                              // );
-                              return const SizedBox.shrink(); // Returns an invisible widget that takes 0 space
+                              return const SizedBox.shrink();
                             })(),
                             Text(
                               ReviewData.averageRating(
                                 widget.product,
-                              ).toStringAsFixed(1),
+                              ).toStringAsFixed(1), // Added bang operator (!) if widget.product is nullable
                               style: const TextStyle(
                                 color: kTextMuted,
                                 fontSize: 12,
