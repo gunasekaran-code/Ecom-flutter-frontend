@@ -535,13 +535,6 @@ class _OrderCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _PillBtn(
-                label: 'Details',
-                icon: Icons.list_alt_rounded,
-                color: kTextDark,
-                filled: false,
-                onTap: () => _showDetails(context),
-              ),
               if (order.status != 'cancelled' && order.status != 'delivered')
                 _PillBtn(
                   label: 'Track',
@@ -549,14 +542,6 @@ class _OrderCard extends StatelessWidget {
                   color: const Color(0xFF1565C0),
                   filled: true,
                   onTap: () => _showTracking(context),
-                ),
-              if (order.status != 'cancelled' && order.status != 'delivered')
-                _PillBtn(
-                  label: 'Deliver',
-                  icon: Icons.task_alt_rounded,
-                  color: const Color(0xFF1DB954),
-                  filled: true,
-                  onTap: () => _markDelivered(context),
                 ),
               if (order.canCancel)
                 _PillBtn(
@@ -566,6 +551,13 @@ class _OrderCard extends StatelessWidget {
                   filled: false,
                   onTap: () => _confirmCancel(context),
                 ),
+              _PillBtn(
+                label: 'Details',
+                icon: Icons.list_alt_rounded,
+                color: kTextDark,
+                filled: false,
+                onTap: () => _showDetails(context),
+              ),
             ],
           ),
         ),
@@ -881,7 +873,7 @@ class _ItemRow extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                       webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                       errorBuilder: (context, error, stackTrace) =>
                           _placeholder(),
                     )
