@@ -34,9 +34,9 @@ class _ProfilePageState extends State<ProfilePage> {
   String? get _gender => _userData['gender']?.toString();
   String get _languageLabel => _languageController.current.profileLabel;
   String? get _imageUrl =>
-      (_userData['profile_image'] ??
+      (_userData['image_url'] ??
               _userData['avatar'] ??
-              _userData['image_url'])
+              _userData['profile_image'])
           ?.toString();
   String get _initial =>
       _fullName.trim().isNotEmpty ? _fullName.trim()[0].toUpperCase() : 'U';

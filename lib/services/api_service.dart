@@ -396,7 +396,20 @@ class ApiService {
     }
   }
 
+  static String? _profileImageUrl(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') return null;
+
+    final filename = trimmed.split('/').last;
+
+    return '$_assetBaseUrl/admin/api/profile-image/$filename';
+  }
+
   static Map<String, dynamic> _normalizeUser(Map<String, dynamic> user) {
+    final imageUrl = _profileImageUrl(
+      user['profile_image']?.toString() ?? user['image_url']?.toString(),
+    );
     return {
       ...user,
       'id': user['id'],
@@ -404,9 +417,8 @@ class ApiService {
       'email': user['email']?.toString(),
       'phone': user['phone_number']?.toString() ?? user['phone']?.toString(),
       'gender': user['gender']?.toString(),
-      'image_url': _absoluteAssetUrl(
-        user['profile_image']?.toString() ?? user['image_url']?.toString(),
-      ),
+      'profile_image': imageUrl,
+      'image_url': imageUrl,
     };
   }
 

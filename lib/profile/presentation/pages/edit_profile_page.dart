@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_platform_interface/cached_network_image_platform_interface.dart';
 
 class EditProfilePage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -551,74 +553,95 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildAvatar() {
-    ImageProvider<Object>? imageProvider;
-    if (_selectedImageBytes != null) {
-      imageProvider = MemoryImage(_selectedImageBytes!);
-    } else if (_currentImageUrl.isNotEmpty) {
-      imageProvider = NetworkImage(_currentImageUrl);
-    }
-
-    return Stack(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: CircleAvatar(
-            radius: 52,
-            backgroundColor: kSurface,
-            backgroundImage: imageProvider,
-            child: imageProvider == null
-                ? Text(
-                    _initial,
-                    style: const TextStyle(
-                      fontSize: 38,
-                      color: kBrandRed,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+  Widget avatarChild;
+  if (_selectedImageBytes != null) {
+    avatarChild = ClipOval(
+      child: Image.memory(
+        _selectedImageBytes!,
+        width: 96,
+        height: 96,
+        fit: BoxFit.cover,
+      ),
+    );
+  } else if (_currentImageUrl.isNotEmpty) {
+    avatarChild = ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: _currentImageUrl,
+        width: 96,
+        height: 96,
+        fit: BoxFit.cover,
+        imageRenderMethodForWeb: ImageRenderMethodForWeb.HtmlImage, // ← key fix
+        placeholder: (context, url) =>
+            const CircularProgressIndicator(strokeWidth: 2),
+        errorWidget: (context, url, error) => Text(
+          _initial,
+          style: const TextStyle(
+            fontSize: 38,
+            color: kBrandRed,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        Positioned(
-          bottom: 2,
-          right: 2,
-          child: GestureDetector(
-            onTap: _showImagePickerOptions,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: kBrandRed,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: kBrandRedDark.withOpacity(0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(8),
-              child: const Icon(
-                Icons.camera_alt,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
+    );
+  } else {
+    avatarChild = Text(
+      _initial,
+      style: const TextStyle(
+        fontSize: 38,
+        color: kBrandRed,
+        fontWeight: FontWeight.bold,
+      ),
     );
   }
+
+  return Stack(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 52,
+          backgroundColor: kSurface,
+          child: avatarChild,
+        ),
+      ),
+      Positioned(
+        bottom: 2,
+        right: 2,
+        child: GestureDetector(
+          onTap: _showImagePickerOptions,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: kBrandRed,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: kBrandRedDark.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(8),
+            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 
   Widget _buildTextField({
     required TextEditingController controller,
