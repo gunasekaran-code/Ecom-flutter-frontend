@@ -60,6 +60,8 @@ class ApiService {
     for (final key in keys) {
       final value = data[key];
       if (value == null) continue;
+      if (value is Map || value is List)
+        continue; // ← skip nested objects, don't stringify them
       final text = value.toString().trim();
       if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
     }
@@ -1360,9 +1362,45 @@ class ApiService {
             _firstStringValue(item, ['product_price', 'price', 'unit_price']) ??
             _firstStringValue(productMap, ['price', 'selling_price']);
         item['quantity'] ??= item['quantity'] ?? item['qty'] ?? 1;
-        final image =
-            _firstStringValue(item, ['image_url', 'image']) ??
-            _firstStringValue(productMap, ['image_url', 'image']);
+
+        // ── Widened image lookup: same key variety as _normalizeProduct,
+        // checked on the item itself, then on the nested product object ──
+        const imageKeys = [
+          'image_url',
+          'image',
+          'product_image',
+          'productImage',
+          'image_path',
+          'imagePath',
+          'image_name',
+          'product_img',
+          'productImageUrl',
+          'product_image_url',
+          'thumbnail',
+          'thumbnail_url',
+          'thumb',
+          'photo',
+          'photo_url',
+          'main_image',
+          'main_image_url',
+        ];
+        String? image =
+            _firstStringValue(item, imageKeys) ??
+            _firstStringValue(productMap, imageKeys);
+
+        // Fallback: first entry of a product's `images` array, if present
+        if (image == null) {
+          final images = productMap['images'] ?? item['images'];
+          if (images is List && images.isNotEmpty) {
+            final first = images.first;
+            if (first is Map<String, dynamic>) {
+              image = _firstStringValue(first, imageKeys);
+            } else if (first is String) {
+              image = first;
+            }
+          }
+        }
+
         item['image_url'] = _absoluteAssetUrl(image);
         return item;
       }).toList();

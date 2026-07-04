@@ -129,11 +129,12 @@ class _OrderPageState extends State<OrderPage>
   @override
   void initState() {
     super.initState();
+    debugPrint('🟢 OrderPage initState called');
     _tab = TabController(length: 3, vsync: this);
     _future = fetchOrders(widget.userId);
     _orderSubscription = ApiService.orderEvents.stream.listen((event) {
-    if (!mounted) return;
-    _load();
+      if (!mounted) return;
+      _load();
     });
   }
 
@@ -212,10 +213,14 @@ class _OrderPageState extends State<OrderPage>
             return const ListContentSkeleton(itemCount: 4);
           }
           if (snap.hasError) {
-            return const _EmptyState(
+            debugPrint(
+              '🔴 Order fetch error: ${snap.error}\n${snap.stackTrace}',
+            );
+            return _EmptyState(
               icon: Icons.wifi_off_rounded,
               label: 'Could not load orders',
-              sub: 'Pull down to refresh',
+              sub:
+                  '${snap.error}', // <-- shows the real error on screen instead of hiding it
             );
           }
           final all = snap.data ?? [];
@@ -876,7 +881,7 @@ class _ItemRow extends StatelessWidget {
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                       webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                       errorBuilder: (context, error, stackTrace) =>
                           _placeholder(),
                     )
