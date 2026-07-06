@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.10:8000/api';
+  static const String baseUrl = 'http://192.168.1.07:8000/api';
   static final String _assetBaseUrl = Uri.parse(baseUrl).origin;
 
   static const bool debugMode = true;
@@ -1482,4 +1482,166 @@ class ApiService {
       return false;
     }
   }
+
+  // ─────────────────────────────────────────────
+  //  REVIEWS APIs
+  // ─────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> addReview({
+    required int productId,
+    required int rating,
+    required String review,
+  }) async {
+    try {
+      final response = await _postJson('/user/review/add', {
+        'product_id': productId,
+        'rating': rating,
+        'review': review,
+      }, authenticated: true);
+      final data = _decodeBody(response);
+      if (_isSuccessStatus(response.statusCode)) {
+        return {'success': true, 'data': data};
+      }
+      return {
+        'success': false,
+        'statusCode': response.statusCode,
+        'error': _errorMessage(data, 'Could not submit review.'),
+      };
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  /// Submits a new review for a product
+  static Future<Map<String, dynamic>> submitReview({
+    required int productId,
+    required double rating,
+    required String title,
+    required String comment,
+  }) async {
+    try {
+      _log('Submitting review for product ID: $productId');
+
+      // Use '/user/review/add' without an 's' to match your working backend route
+      final response = await _postJson(
+        '/user/review/add',
+        {
+          'product_id': productId,
+          'rating': rating,
+          'title': title,
+          'comment': comment,
+        },
+        authenticated: true, // Requires bearer token validation
+      );
+
+      _log('Submit review status: ${response.statusCode}');
+      final data = _decodeBody(response);
+
+      if (_isSuccessStatus(response.statusCode)) {
+        return {'success': true, 'data': data};
+      }
+
+      return {
+        'success': false,
+        'error': _errorMessage(data, 'Failed to submit review.'),
+      };
+    } on TimeoutException {
+      return {
+        'success': false,
+        'error': 'Request timed out. Please try again.',
+      };
+    } catch (e) {
+      _logError('Error submitting review: $e');
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  /// Fetches all reviews for a specific product
+  /// Fetches all reviews for a specific product
+  static Future<List<dynamic>> getProductReviews(int productId) async {
+    try {
+      _log('Fetching reviews for product ID: $productId');
+
+      // FIX: Ensure this is calling your GET helper, not POST
+      final response = await _getJson(
+        '/user/review/product/$productId', // String interpolation fixes the %7BproductId%7D issue
+        authenticated: true,
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = _decodeBody(response);
+        return _listFromDecoded(decoded, ['data', 'reviews']);
+      }
+
+      _logError('Failed to load reviews: ${response.statusCode}');
+      return const <dynamic>[];
+    } catch (e) {
+      _logError('Error fetching product reviews: $e');
+      return const <dynamic>[];
+    }
+  }
+
+  static Future<Map<String, dynamic>> canReviewProduct(int productId) async {
+    try {
+      final orders = await getOrders();
+      final reviews = await getProductReviews(productId);
+      final currentUser = await getUser();
+
+      // ── 1. Purchased + delivered? ──
+      bool purchased = false;
+      for (final order in orders) {
+        final status = (order['status'] ?? '').toString().toLowerCase();
+        if (status != 'delivered') continue;
+
+        final items = order['items'];
+        if (items is! List) continue;
+
+        for (final item in items) {
+          if (item is! Map) continue;
+          final nestedProduct = item['product'];
+          final rawId = item['product_id'] ??
+              (nestedProduct is Map ? nestedProduct['id'] : null);
+          final itemProductId = int.tryParse(rawId?.toString() ?? '');
+          if (itemProductId == productId) {
+            purchased = true;
+            break;
+          }
+        }
+        if (purchased) break;
+      }
+
+      // ── 2. Already reviewed? ──
+      bool alreadyReviewed = false;
+      final currentUserId = currentUser?['id']?.toString();
+      if (currentUserId != null) {
+        for (final r in reviews) {
+          if (r is! Map) continue;
+          final reviewUserId = (r['user_id'] ??
+                  r['reviewer_id'] ??
+                  r['customer_id'] ??
+                  (r['user'] is Map ? r['user']['id'] : null))
+              ?.toString();
+          if (reviewUserId != null && reviewUserId == currentUserId) {
+            alreadyReviewed = true;
+            break;
+          }
+        }
+      }
+
+      return {
+        'success': true,
+        'canReview': purchased && !alreadyReviewed,
+        'alreadyReviewed': alreadyReviewed,
+      };
+    } catch (e) {
+      _logError('Error checking review eligibility: $e');
+      return {
+        'success': false,
+        'canReview': false,
+        'alreadyReviewed': false,
+        'error': 'Network error: $e',
+      };
+    }
+  }
+
 }

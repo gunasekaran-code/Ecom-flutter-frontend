@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:wss_sports/utils/review_data.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
 import 'package:wss_sports/shop/presentation/pages/all_reviews_page.dart';
-import 'package:wss_sports/utils/review_data.dart';
+import 'package:wss_sports/shop/presentation/widgets/write_review_sheet.dart';
 
 const Color _kRatingGreen = Color(0xFF1DB954);
 const Color _kRatingGreenSoft = Color(0xFFE9FBF1);
@@ -10,19 +12,53 @@ const Color _kRatingGreenSoft = Color(0xFFE9FBF1);
 /// product detail page. Mirrors the "Ratings and reviews" sheet design.
 Future<void> showRatingReviewsSheet(
   BuildContext context,
-  Map<String, dynamic> product,
-) {
+  Map<String, dynamic> product, {
+  VoidCallback? onReviewSubmitted,
+}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _RatingReviewsSheet(product: product),
+    builder: (_) => _RatingReviewsSheet(
+      product: product,
+      onReviewSubmitted: onReviewSubmitted,
+    ),
   );
 }
 
-class _RatingReviewsSheet extends StatelessWidget {
+class _RatingReviewsSheet extends StatefulWidget {
   final Map<String, dynamic> product;
-  const _RatingReviewsSheet({required this.product});
+  final VoidCallback? onReviewSubmitted;
+  const _RatingReviewsSheet({required this.product, this.onReviewSubmitted});
+
+  @override
+  State<_RatingReviewsSheet> createState() => _RatingReviewsSheetState();
+}
+
+class _RatingReviewsSheetState extends State<_RatingReviewsSheet> {
+  Map<String, dynamic> get product => widget.product;
+  VoidCallback? get onReviewSubmitted => widget.onReviewSubmitted;
+
+  bool _checkingEligibility = true;
+  bool _canReview = false;
+  bool _alreadyReviewed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEligibility();
+  }
+
+  Future<void> _loadEligibility() async {
+    final productId = int.tryParse(product['id']?.toString() ?? '') ?? 0;
+    final result = await ApiService.canReviewProduct(productId);
+    if (!mounted) return;
+    setState(() {
+      _canReview = result['canReview'] == true;
+      _alreadyReviewed = result['alreadyReviewed'] == true;
+      _checkingEligibility = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,11 +163,7 @@ class _RatingReviewsSheet extends StatelessWidget {
                             fontSize: 13,
                           ),
                         ),
-                        const Icon(
-                          Icons.verified,
-                          size: 14,
-                          color: kTextMuted,
-                        ),
+                        const Icon(Icons.verified, size: 14, color: kTextMuted),
                         const SizedBox(width: 3),
                         const Text(
                           'Verified Buyers',
@@ -196,7 +228,9 @@ class _RatingReviewsSheet extends StatelessWidget {
                     const Divider(color: kBorder, height: 1),
                     const SizedBox(height: 12),
 
-                    ...reviews.take(2).map((r) => _ReviewPreviewTile(review: r)),
+                    ...reviews
+                        .take(2)
+                        .map((r) => _ReviewPreviewTile(review: r)),
 
                     if (reviews.isEmpty)
                       const Padding(
@@ -250,6 +284,128 @@ class _RatingReviewsSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 10),
+
+                    // ── Write a Review button: gated by eligibility ──
+                    if (_checkingEligibility)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kBrandRed.withOpacity(0.5),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (_alreadyReviewed)
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kBorder,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'You already reviewed this product',
+                                style: TextStyle(
+                                  color: kTextMuted,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else if (!_canReview)
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kBorder,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Write a Review',
+                                style: TextStyle(
+                                  color: kTextMuted,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Only verified buyers of a delivered order can review.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: kTextMuted, fontSize: 12),
+                          ),
+                        ],
+                      )
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final productId =
+                                int.tryParse(product['id']?.toString() ?? '') ?? 0;
+                            final submitted = await showWriteReviewSheet(
+                              context,
+                              productId: productId,
+                            );
+                            if (submitted) {
+                              onReviewSubmitted?.call();
+                              if (mounted) {
+                                setState(() {
+                                  _canReview = false;
+                                  _alreadyReviewed = true;
+                                });
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kBrandRed,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Write a Review',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -260,6 +416,8 @@ class _RatingReviewsSheet extends StatelessWidget {
     );
   }
 }
+
+
 
 class _ReviewPreviewTile extends StatelessWidget {
   final Map<String, dynamic> review;
@@ -282,10 +440,7 @@ class _ReviewPreviewTile extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 7,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: _kRatingGreen,
                   borderRadius: BorderRadius.circular(5),
@@ -342,15 +497,28 @@ class _ReviewPreviewTile extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(name, style: const TextStyle(color: kTextMuted, fontSize: 12)),
+              Text(
+                name,
+                style: const TextStyle(color: kTextMuted, fontSize: 12),
+              ),
               const Spacer(),
               const Icon(Icons.thumb_up_outlined, size: 14, color: kTextMuted),
               const SizedBox(width: 3),
-              Text('$helpful', style: const TextStyle(color: kTextMuted, fontSize: 12)),
+              Text(
+                '$helpful',
+                style: const TextStyle(color: kTextMuted, fontSize: 12),
+              ),
               const SizedBox(width: 10),
-              const Icon(Icons.thumb_down_outlined, size: 14, color: kTextMuted),
+              const Icon(
+                Icons.thumb_down_outlined,
+                size: 14,
+                color: kTextMuted,
+              ),
               const SizedBox(width: 3),
-              Text('$notHelpful', style: const TextStyle(color: kTextMuted, fontSize: 12)),
+              Text(
+                '$notHelpful',
+                style: const TextStyle(color: kTextMuted, fontSize: 12),
+              ),
             ],
           ),
         ],

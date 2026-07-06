@@ -583,20 +583,20 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  Future<void> _markDelivered(BuildContext context) async {
-    final success = await deliverOrder(order.id, userId);
-    if (context.mounted) {
-      showAppSnackBar(
-        context,
-        title: success ? 'Success' : 'Error',
-        message: success
-            ? 'Order #${order.id} delivered'
-            : 'Could not update order',
-        type: success ? AppSnackBarType.success : AppSnackBarType.error,
-      );
-      if (success) onRefresh();
-    }
-  }
+  // Future<void> _markDelivered(BuildContext context) async {
+  //   final success = await deliverOrder(order.id, userId);
+  //   if (context.mounted) {
+  //     showAppSnackBar(
+  //       context,
+  //       title: success ? 'Success' : 'Error',
+  //       message: success
+  //           ? 'Order #${order.id} delivered'
+  //           : 'Could not update order',
+  //       type: success ? AppSnackBarType.success : AppSnackBarType.error,
+  //     );
+  //     if (success) onRefresh();
+  //   }
+  // }
 
   Future<void> _confirmCancel(BuildContext context) async {
     final confirmed = await showCancelOrderDialog(context);
@@ -849,7 +849,7 @@ class _DetailInfoTile extends StatelessWidget {
   );
 }
 
-// ── Item Row ──────────────────────────────────────────────────────────────────
+// ── Item Row ────────────────────────────────────────────────
 class _ItemRow extends StatelessWidget {
   final OrderItemModel item;
   const _ItemRow({required this.item});

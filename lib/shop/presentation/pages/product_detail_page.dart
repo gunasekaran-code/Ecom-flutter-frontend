@@ -142,6 +142,27 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return ProductData.assetUrl(image);
   }
 
+  // ── Trigger Ratings Sheet with Refresh Callback ────────────────────
+  void _openRatingReviewsSheet() {
+    if (product == null) return;
+    
+    showRatingReviewsSheet(
+      context,
+      product!,
+      onReviewSubmitted: () async {
+        // 1. Fetch fresh data from the server using your existing widget.productId
+        final freshDetail = await ApiService.getProductDetail(widget.productId);
+        
+        if (freshDetail != null && mounted) {
+          setState(() {
+            // 2. Re-assign the product property to force a UI update with the new review
+            product = freshDetail;
+          });
+        }
+      },
+    );
+  }
+
   // ── Select / deselect a variation ─────────────────────────────────
   // Also resets the image carousel to page 0 so the variation image is visible.
   void _selectVariation(Map<String, dynamic>? v) {
@@ -245,9 +266,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         : Colors.grey.shade400;
 
     return GestureDetector(
-      onTap: isUnavailable
-          ? null
-          : () => _selectVariation(isSelected ? null : v),
+      onTap: _openRatingReviewsSheet,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
