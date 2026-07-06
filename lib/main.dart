@@ -12,9 +12,13 @@ import 'package:wss_sports/auth/pages/login_page.dart';
 import 'package:wss_sports/auth/pages/reset_password.dart';
 import 'package:wss_sports/splash/splash_screen.dart'; // ← NEW
 
+
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 void main() {
   runApp(const MyApp());
 }
+
 
 class _ResetPasswordLink {
   final String token;
@@ -148,6 +152,7 @@ class _MyAppState extends State<MyApp> {
             _openPendingResetLink();
 
             return MaterialApp(
+              navigatorObservers: [routeObserver],
               navigatorKey: navigatorKey,
               debugShowCheckedModeBanner: false,
               locale: language.locale,

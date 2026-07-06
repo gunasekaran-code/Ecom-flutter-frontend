@@ -1581,6 +1581,22 @@ class ApiService {
     }
   }
 
+  static Future<List<dynamic>> getUserReviews() async {
+    try {
+      final response = await _getJson('/user/reviews', authenticated: true);
+      if (response.statusCode == 200) {
+        final decoded = _decodeBody(response);
+        return _listFromDecoded(decoded, ['data', 'reviews', 'results']);
+      }
+      _logError(
+        'Get user reviews failed: ${response.statusCode} ${response.body}',
+      );
+    } catch (e) {
+      _logError('Error fetching user reviews: $e');
+    }
+    return [];
+  }
+
   static Future<Map<String, dynamic>> canReviewProduct(int productId) async {
     try {
       final orders = await getOrders();
@@ -1599,7 +1615,8 @@ class ApiService {
         for (final item in items) {
           if (item is! Map) continue;
           final nestedProduct = item['product'];
-          final rawId = item['product_id'] ??
+          final rawId =
+              item['product_id'] ??
               (nestedProduct is Map ? nestedProduct['id'] : null);
           final itemProductId = int.tryParse(rawId?.toString() ?? '');
           if (itemProductId == productId) {
@@ -1616,11 +1633,12 @@ class ApiService {
       if (currentUserId != null) {
         for (final r in reviews) {
           if (r is! Map) continue;
-          final reviewUserId = (r['user_id'] ??
-                  r['reviewer_id'] ??
-                  r['customer_id'] ??
-                  (r['user'] is Map ? r['user']['id'] : null))
-              ?.toString();
+          final reviewUserId =
+              (r['user_id'] ??
+                      r['reviewer_id'] ??
+                      r['customer_id'] ??
+                      (r['user'] is Map ? r['user']['id'] : null))
+                  ?.toString();
           if (reviewUserId != null && reviewUserId == currentUserId) {
             alreadyReviewed = true;
             break;
@@ -1643,5 +1661,4 @@ class ApiService {
       };
     }
   }
-
 }

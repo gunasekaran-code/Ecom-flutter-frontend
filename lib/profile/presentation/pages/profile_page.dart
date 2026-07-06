@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wss_sports/main.dart';
 import 'package:wss_sports/core/localization/app_strings.dart';
 import 'package:wss_sports/core/localization/app_language.dart';
 import 'package:wss_sports/services/api_service.dart';
@@ -18,10 +19,16 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with RouteAware {
   final AppLanguageController _languageController =
       AppLanguageController.instance;
   late Map<String, dynamic> _userData;
+
+  // ── Live stats (orders / wishlist / reviews) ──────────────────────────
+  int? _ordersCount;
+  int? _wishlistCount;
+  int? _reviewsCount;
+  bool _statsLoading = true;
 
   String get orders => 'Orders';
   String get wishlist => 'Wishlist';
@@ -46,6 +53,28 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _userData = Map<String, dynamic>.from(widget.userData);
     _loadUserData();
+    _loadStats();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  // Called automatically every time the user navigates back to this page
+  @override
+  void didPopNext() {
+    _loadStats();
   }
 
   Future<void> _loadUserData() async {
@@ -63,6 +92,40 @@ class _ProfilePageState extends State<ProfilePage> {
       });
     }
     // debugPrint('📦 ${runtimeType} userData: $_userData'); // ProfilePage
+  }
+
+  // ── Pulls real counts for the Orders / Wishlist / Reviews stat tiles ──
+  Future<void> _loadStats() async {
+    final rawId = _userData['id'] ?? widget.userData['id'];
+    final resolvedUserId = rawId is int
+        ? rawId
+        : int.tryParse(rawId?.toString() ?? '') ?? 0;
+
+    try {
+      final results = await Future.wait([
+        ApiService.getOrders(),
+        ApiService.getWishlist(resolvedUserId),
+        ApiService.getUserReviews(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _ordersCount = (results[0] as List).length;
+        _wishlistCount = (results[1] as List).length;
+        _reviewsCount = (results[2] as List).length;
+        _statsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statsLoading = false;
+      });
+    }
+  }
+
+  String _statValue(int? count) {
+    if (_statsLoading) return '…';
+    return (count ?? 0).toString();
   }
 
   @override
@@ -178,11 +241,7 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                // mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // _circleIconButton(Icons.arrow_back_ios_new_rounded, () {
-                  //   Navigator.maybePop(context);
-                  // }),
                   Text(
                     context.strings.myProfile,
                     textAlign: TextAlign.center,
@@ -192,7 +251,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  // _circleIconButton(Icons.settings_outlined, () {}),
                 ],
               ),
               const SizedBox(height: 28),
@@ -324,7 +382,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ===== Stats card (overlapping the header) =====
+  // ===== Stats card (overlapping the header) — now backed by real data =====
   Widget _buildStatsRow(AppStrings strings) {
     return Transform.translate(
       offset: const Offset(0, -40),
@@ -344,11 +402,23 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         child: Row(
           children: [
-            _statTile(Icons.shopping_bag_outlined, '24', strings.orders),
+            _statTile(
+              Icons.shopping_bag_outlined,
+              _statValue(_ordersCount),
+              strings.orders,
+            ),
             _divider(),
-            _statTile(Icons.favorite_border_rounded, '57', strings.wishlist),
+            _statTile(
+              Icons.favorite_border_rounded,
+              _statValue(_wishlistCount),
+              strings.wishlist,
+            ),
             _divider(),
-            _statTile(Icons.star_border_rounded, '8', strings.reviews),
+            _statTile(
+              Icons.star_border_rounded,
+              _statValue(_reviewsCount),
+              strings.reviews,
+            ),
           ],
         ),
       ),
