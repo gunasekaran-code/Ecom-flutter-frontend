@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.07:8000/api';
+  static const String baseUrl = 'http://192.168.1.7:8000/api';
   static final String _assetBaseUrl = Uri.parse(baseUrl).origin;
 
   static const bool debugMode = true;

@@ -266,7 +266,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         : Colors.grey.shade400;
 
     return GestureDetector(
-      onTap: _openRatingReviewsSheet,
+      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

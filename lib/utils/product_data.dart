@@ -1,5 +1,5 @@
 class ProductData {
-  static const String _storageBase = 'http://192.168.1.10:8000/storage/';
+  static const String _storageBase = 'http://192.168.1.7:8000/storage/';
 
   static String? _firstStringValue(
     Map<String, dynamic> data,
@@ -50,7 +50,7 @@ class ProductData {
 
     final cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
     if (cleanPath.startsWith('storage/')) {
-      return 'http://192.168.1.10:8000/$cleanPath';
+      return 'http://192.168.1.7:8000/$cleanPath';
     }
     return '$_storageBase$cleanPath';
   }

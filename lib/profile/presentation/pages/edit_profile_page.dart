@@ -31,7 +31,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final raw = (_profileData['profile_image'] ?? '').toString();
   if (raw.isEmpty) return '';
   if (raw.startsWith('http')) return raw;
-  return 'http://192.168.1.10:8000/$raw'; // or your ApiService.baseUrl constant
+  return 'http://192.168.1.7:8000/$raw'; // or your ApiService.baseUrl constant
 }
 
   String get _initial {
