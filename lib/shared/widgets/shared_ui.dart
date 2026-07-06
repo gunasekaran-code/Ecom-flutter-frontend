@@ -983,3 +983,62 @@ Future<bool?> showSaveProfileDialog(BuildContext context) {
     ),
   );
 }
+
+
+
+// ── App Dropdown Field ─────────────────────────────────────────────
+
+class AppDropdownField<T> extends StatelessWidget {
+  final T? value;
+  final String label;
+  final List<T> items;
+  final ValueChanged<T?> onChanged;
+  final String Function(T)? itemLabelBuilder;
+
+  const AppDropdownField({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.items,
+    required this.onChanged,
+    this.itemLabelBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                color: kTextDark, fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<T>(
+          value: value,
+          items: items
+              .map((item) => DropdownMenuItem<T>(
+                    value: item,
+                    child: Text(itemLabelBuilder?.call(item) ?? item.toString()),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: kSurface,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kBorder)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: kBrandRed, width: 1.5)),
+          ),
+        ),
+      ],
+    );
+  }
+}

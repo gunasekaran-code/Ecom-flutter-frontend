@@ -77,6 +77,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void initState() {
     super.initState();
     _loadSavedAddresses();
+    _prefillFromUserProfile();
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
@@ -186,13 +187,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Future<void> _loadSavedAddresses() async {
     setState(() => _isLoadingAddresses = true);
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('saved_addresses_${widget.userId}');
-    final list = raw != null
-        ? List<Map<String, dynamic>>.from(
-            (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e)),
-          )
-        : <Map<String, dynamic>>[];
+
+    List<Map<String, dynamic>> list = [];
+
+    // ── Try backend first ──
+    final result = await ApiService.getUserAddresses(widget.userId);
+    if (result['success'] == true) {
+      final data = result['data'];
+      final rawList = (data is Map && data['data'] is List)
+          ? data['data']
+          : (data is List ? data : const []);
+      list = (rawList as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
+    // ── Fallback to local cache if backend returned nothing ──
+    if (list.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('saved_addresses_${widget.userId}');
+      if (raw != null) {
+        list = List<Map<String, dynamic>>.from(
+          (jsonDecode(raw) as List).map((e) => Map<String, dynamic>.from(e)),
+        );
+      }
+    }
 
     if (!mounted) return;
     setState(() {
@@ -203,12 +223,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
           (addr) => addr['is_default'] == true,
           orElse: () => _savedAddresses.first,
         );
-        _selectedAddressId = defaultAddress['id'] as int?;
+        _selectedAddressId = int.tryParse(defaultAddress['id'].toString());
         _showAddressForm = false;
       } else {
         _showAddressForm = true;
       }
     });
+  }
+
+  // ── NEW: prefill name/email/phone from the logged-in user's profile ──
+  Future<void> _prefillFromUserProfile() async {
+    final user = await ApiService.getUser();
+    if (!mounted || user == null) return;
+    if (_firstNameController.text.isNotEmpty)
+      return; // don't clobber user edits
+
+    final fullName = (user['full_name'] ?? '').toString().trim();
+    if (fullName.isNotEmpty) {
+      final parts = fullName.split(RegExp(r'\s+'));
+      _firstNameController.text = parts.first;
+      _lastNameController.text = parts.length > 1
+          ? parts.sublist(1).join(' ')
+          : '';
+    }
+    _emailController.text = (user['email'] ?? '').toString();
+    _phoneController.text = (user['phone'] ?? '').toString();
   }
 
   Future<void> _startRazorpayPayment() async {
@@ -403,8 +442,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
     setState(() => _isSavingAddress = true);
 
-    final newAddress = {
-      'id': DateTime.now().millisecondsSinceEpoch,
+    final addressData = {
       'address_type': _selectedAddressType,
       'first_name': _firstNameController.text.trim(),
       'last_name': _lastNameController.text.trim(),
@@ -419,13 +457,33 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'is_default': _savedAddresses.isEmpty,
     };
 
+    final result = await ApiService.createAddress(
+      userId: widget.userId,
+      addressData: addressData,
+    );
+
+    Map<String, dynamic> newAddress;
+    if (result['success'] == true && result['data'] is Map) {
+      final data = result['data'] as Map;
+      final saved = data['data'] is Map
+          ? Map<String, dynamic>.from(data['data'])
+          : Map<String, dynamic>.from(data);
+      newAddress = {...addressData, ...saved};
+      newAddress['id'] ??= DateTime.now().millisecondsSinceEpoch;
+    } else {
+      newAddress = {
+        ...addressData,
+        'id': DateTime.now().millisecondsSinceEpoch,
+      };
+    }
+
     setState(() {
       _savedAddresses.add(newAddress);
-      _selectedAddressId = newAddress['id'] as int;
+      _selectedAddressId = int.tryParse(newAddress['id'].toString());
       _isSavingAddress = false;
       _showAddressForm = false;
     });
-    await _persistAddresses();
+    await _persistAddresses(); // local cache stays as offline fallback
 
     if (!mounted) return;
     showAppSnackBar(
@@ -1182,7 +1240,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildDropdownField<String>(
+          AppDropdownField<String>(
             value: _selectedAddressType,
             label: 'Address Type',
             items: _addressTypes,
@@ -1250,7 +1308,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           Row(
             children: [
               Expanded(
-                child: _buildDropdownField<String>(
+                child: AppDropdownField<String>(
                   value: _selectedState,
                   label: 'State / Province',
                   items: _stateOptions,
@@ -1269,7 +1327,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildDropdownField<String>(
+          AppDropdownField<String>(
             value: _selectedCountry,
             label: 'Country',
             items: _countries,
@@ -1369,7 +1427,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _buildDropdownField<T>({
+  Widget AppDropdownField<T>({
     required T? value,
     required String label,
     required List<T> items,

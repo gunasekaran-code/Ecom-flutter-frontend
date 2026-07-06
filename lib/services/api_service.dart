@@ -1203,15 +1203,12 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────
-  //  ADDRESS APIs
+  //  ADDRESS APIs.
   // ─────────────────────────────────────────────
 
   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
     try {
-      final response = await _getJson(
-        'user/addresses/',
-        queryParams: {'user_id': userId.toString()},
-      );
+      final response = await _getJson('user/addresses/', authenticated: true);
       if (response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
