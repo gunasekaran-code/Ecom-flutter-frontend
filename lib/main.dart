@@ -1,24 +1,21 @@
 import 'dart:async';
-
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:wss_sports/shop/presentation/pages/home_page.dart';
+import 'package:wss_sports/services/api_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
 import 'package:wss_sports/core/localization/app_language.dart';
 import 'package:wss_sports/core/localization/app_strings.dart';
-
 import 'package:wss_sports/auth/pages/forgot_password.dart';
 import 'package:wss_sports/auth/pages/login_page.dart';
 import 'package:wss_sports/auth/pages/reset_password.dart';
 import 'package:wss_sports/splash/splash_screen.dart'; // ← NEW
-
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 void main() {
   runApp(const MyApp());
 }
-
 
 class _ResetPasswordLink {
   final String token;
@@ -48,6 +45,12 @@ class _MyAppState extends State<MyApp> {
     _loadSettings = _languageController.load();
     handleDeepLink(Uri.base.toString());
     initDeepLinks();
+  }
+
+  Future<Widget> getStartScreen() async {
+    final userData = await ApiService.restoreLoggedInUser();
+    if (userData == null) return const LoginPage();
+    return HomePage(userData: userData);
   }
 
   Future<void> initDeepLinks() async {

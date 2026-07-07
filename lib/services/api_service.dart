@@ -2,7 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:wss_sports/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+Future<void> saveLoginSession(String token, Map<String, dynamic> user) async {
+  await SecureStorageService.saveToken(token);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('user_data', jsonEncode(user));
+  await prefs.setBool('is_logged_in', true);
+}
 
 class ApiService {
   static const String baseUrl = 'http://192.168.1.7:8000/api';
@@ -39,15 +47,86 @@ class ApiService {
     return fallback;
   }
 
-  // ─── NEW: headers with Bearer token ───────────────────────────────────────
+  // seccion for user profile update
+  Future<Map<String, String>> getHeaders() async {
+    final token = await SecureStorageService.getToken() ?? '';
+
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  // _authHeaders()
   static Future<Map<String, String>> _authHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token') ?? '';
+    final token = await SecureStorageService.getToken() ?? '';
+
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
+  }
+
+  // clearToken()
+  static Future<void> clearToken() async {
+    await SecureStorageService.deleteToken();
+  }
+
+  static Future<void> saveUserData(Map<String, dynamic> user) async {
+    final normalizedUser = _normalizeUser(user);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_data', jsonEncode(normalizedUser));
+    await prefs.setBool('is_logged_in', true);
+  }
+
+  static Future<Map<String, dynamic>> getCachedUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
+    if (userDataString == null || userDataString.isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    try {
+      final decoded = jsonDecode(userDataString);
+      return decoded is Map<String, dynamic>
+          ? _normalizeUser(Map<String, dynamic>.from(decoded))
+          : <String, dynamic>{};
+    } catch (e) {
+      _logError('Could not decode cached user data: $e');
+      return <String, dynamic>{};
+    }
+  }
+
+  static Future<Map<String, dynamic>?> restoreLoggedInUser() async {
+    final hasToken = await SecureStorageService.hasValidToken();
+    if (!hasToken) return null;
+
+    final freshUser = await getUser();
+    if (freshUser != null) {
+      await saveUserData(freshUser);
+      return freshUser;
+    }
+
+    final cachedUser = await getCachedUserData();
+    return cachedUser.isNotEmpty ? cachedUser : null;
+  }
+
+  // logout()
+  Future<void> logout() async {
+    await SecureStorageService.deleteToken();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_data');
+    await prefs.setBool('is_logged_in', false);
+  }
+
+  // save Login Session
+  Future<void> saveLoginSession(String token, Map<String, dynamic> user) async {
+    await SecureStorageService.saveToken(token);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_data', jsonEncode(user));
+    await prefs.setBool('is_logged_in', true);
   }
 
   static bool _isSuccessStatus(int statusCode) =>
@@ -283,9 +362,17 @@ class ApiService {
         // ─── Save token on successful login ────────────────────────────────
         final token = data['token'] ?? data['access'] ?? data['access_token'];
         if (token != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', token.toString());
-          _log('Token saved');
+          await SecureStorageService.saveToken(token.toString());
+          _log('Token saved: $token');
+
+          // add this verification read-back
+          final check = await SecureStorageService.getToken();
+          _log('Token read-back check: $check');
+        }
+
+        final user = data is Map<String, dynamic> ? data['user'] : null;
+        if (user is Map<String, dynamic>) {
+          await saveUserData(_normalizeUser(Map<String, dynamic>.from(user)));
         }
         // ───────────────────────────────────────────────────────────────────
         return {'success': true, 'data': data};
@@ -306,12 +393,6 @@ class ApiService {
     } catch (e) {
       return {'success': false, 'error': 'Network error: $e'};
     }
-  }
-
-  static Future<void> clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    _log('Token cleared');
   }
 
   static Future<Map<String, dynamic>> loginUserWithWakeUp({
@@ -407,12 +488,14 @@ class ApiService {
   }
 
   static Map<String, dynamic> _normalizeUser(Map<String, dynamic> user) {
+    final rawId = user['id'] ?? user['user_id'];
+    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
     final imageUrl = _profileImageUrl(
       user['profile_image']?.toString() ?? user['image_url']?.toString(),
     );
     return {
       ...user,
-      'id': user['id'],
+      'id': id ?? rawId,
       'full_name': user['name']?.toString() ?? user['full_name']?.toString(),
       'email': user['email']?.toString(),
       'phone': user['phone_number']?.toString() ?? user['phone']?.toString(),
@@ -1553,7 +1636,6 @@ class ApiService {
     }
   }
 
-  /// Fetches all reviews for a specific product
   /// Fetches all reviews for a specific product
   static Future<List<dynamic>> getProductReviews(int productId) async {
     try {

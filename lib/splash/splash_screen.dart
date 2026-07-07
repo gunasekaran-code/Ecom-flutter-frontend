@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wss_sports/shared/widgets/shared_ui.dart';
+import 'package:wss_sports/services/api_service.dart';
+// import 'package:wss_sports/shop/presentation/pages/home_page.dart';
+import 'package:wss_sports/shared/widgets/navbar.dart';
+import 'package:wss_sports/auth/pages/login_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -68,10 +72,24 @@ class _SplashScreenState extends State<SplashScreen>
     _textController.forward();
 
     await Future.delayed(const Duration(milliseconds: 1800));
+
     if (!mounted) return;
 
-    // Hands off to LoginPage
-    Navigator.pushReplacementNamed(context, '/LoginPage');
+    final userData = await ApiService.restoreLoggedInUser();
+    if (!mounted) return;
+
+    if (userData != null) {
+      debugPrint('SPLASH restored userData: $userData');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => UserHomePage(userData: userData)),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    }
   }
 
   @override
@@ -90,7 +108,10 @@ class _SplashScreenState extends State<SplashScreen>
           constraints: const BoxConstraints(maxWidth: 440),
           // GlassCard removed; content now floats directly on the scaffold
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 48.0,
+              horizontal: 24.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -128,7 +149,7 @@ class _SplashScreenState extends State<SplashScreen>
                           const Text(
                             'wss sports',
                             style: TextStyle(
-                              color: Color(0xFF1A1A1A), 
+                              color: Color(0xFF1A1A1A),
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5,
@@ -138,7 +159,7 @@ class _SplashScreenState extends State<SplashScreen>
                           Text(
                             'Gear Up. Go Hard.',
                             style: TextStyle(
-                              color: Colors.black54, 
+                              color: Colors.black54,
                               fontSize: 15,
                               letterSpacing: 0.3,
                             ),
@@ -162,7 +183,7 @@ class _SplashScreenState extends State<SplashScreen>
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
-                            color: kBrandRed, 
+                            color: kBrandRed,
                             strokeWidth: 2.5,
                           ),
                         ),

@@ -61,7 +61,7 @@ class _UserHomePageState extends State<UserHomePage> {
           index: _selectedIndex,
           children: [
             HomePage(userData: widget.userData),
-            OrderPage(userId: widget.userData['id']),
+            OrderPage(userId: widget.userData['id'] is int ? widget.userData['id'] as int : 0),
             WishlistPage(
               userData: widget.userData,
               onContinueShopping: () => _onItemTapped(0),

@@ -91,6 +91,7 @@ class _LoginPageState extends State<LoginPage>
         final userData = (data['user'] is Map<String, dynamic>)
             ? (data['user'] as Map<String, dynamic>)
             : data;
+        await ApiService.saveUserData(userData);
 
         await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted) return;
