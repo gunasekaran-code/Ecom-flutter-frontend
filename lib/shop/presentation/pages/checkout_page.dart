@@ -559,6 +559,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (confirm != true) return;
     if (!mounted) return;
 
+    // ── NEW: actually delete on the backend ──
+    final result = await ApiService.deleteAddress(
+      addressId: addressId,
+      userId: widget.userId,
+    );
+
+    if (result['success'] != true) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        title: 'Error',
+        message: result['error']?.toString() ?? 'Could not delete address',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
     setState(() {
       _savedAddresses.removeWhere(
         (address) => _addressId(address) == addressId,
@@ -572,6 +589,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     });
     await _persistAddresses();
 
+    if (!mounted) return;
     showAppSnackBar(
       context,
       title: 'Success',
@@ -1238,7 +1256,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     _showAddressForm = false;
                     _clearForm();
                     if (_savedAddresses.isNotEmpty) {
-                      _selectedAddressId = _addressId(_savedAddresses.first);
+                      _selectedAddressId = _savedAddresses.first['id'];
                     }
                   }),
                   child: const Text('Cancel'),

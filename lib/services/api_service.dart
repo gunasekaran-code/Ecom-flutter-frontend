@@ -1366,8 +1366,13 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
     try {
-      final response = await _getJson('user/addresses/', authenticated: true);
-      if (response.statusCode == 200) {
+      final response = await _getJson(
+        'user/addresses/',
+        queryParams: {'user_id': userId.toString()},
+        authenticated: true,
+      );
+
+      if (_isSuccessStatus(response.statusCode)) {
         final decoded = jsonDecode(response.body);
         final addresses = _listFromDecoded(decoded, [
           'data',
@@ -1380,13 +1385,11 @@ class ApiService {
           'success': true,
           'data': addresses
               .whereType<Map>()
-              .map(
-                (address) =>
-                    _normalizeAddress(Map<String, dynamic>.from(address)),
-              )
+              .map((a) => _normalizeAddress(Map<String, dynamic>.from(a)))
               .toList(),
         };
       }
+
       return {
         'success': false,
         'error': 'HTTP ${response.statusCode}: ${response.body}',
@@ -1402,7 +1405,7 @@ class ApiService {
   }) async {
     try {
       final response = await _postJson(
-        '/addresses/create/',
+        '/user/addresses/create/',
         {
           // fix: correct path
           'user_id': userId,
@@ -1438,11 +1441,10 @@ class ApiService {
     required int userId,
   }) async {
     try {
-      final response = await http
-          .delete(
-            Uri.parse('$baseUrl/addresses/$addressId/delete/?user_id=$userId'),
-          )
-          .timeout(_requestTimeout);
+      final response = await _deleteJson(
+        '/addresses/$addressId/delete/',
+        authenticated: true,
+      );
       if (response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
