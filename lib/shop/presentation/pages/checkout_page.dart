@@ -73,6 +73,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _isPlacingOrder = false;
   bool _isSavingAddress = false;
 
+  int? _addressId(Map<String, dynamic> address) {
+    final id = address['id'] ?? address['address_id'];
+    return id is int ? id : int.tryParse(id?.toString() ?? '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -194,10 +199,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final result = await ApiService.getUserAddresses(widget.userId);
     if (result['success'] == true) {
       final data = result['data'];
-      final rawList = (data is Map && data['data'] is List)
-          ? data['data']
-          : (data is List ? data : const []);
-      list = (rawList as List)
+      final rawList = data is List ? data : const [];
+      list = rawList
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
@@ -223,7 +226,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           (addr) => addr['is_default'] == true,
           orElse: () => _savedAddresses.first,
         );
-        _selectedAddressId = int.tryParse(defaultAddress['id'].toString());
+        _selectedAddressId = _addressId(defaultAddress);
         _showAddressForm = false;
       } else {
         _showAddressForm = true;
@@ -465,9 +468,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     Map<String, dynamic> newAddress;
     if (result['success'] == true && result['data'] is Map) {
       final data = result['data'] as Map;
-      final saved = data['data'] is Map
-          ? Map<String, dynamic>.from(data['data'])
-          : Map<String, dynamic>.from(data);
+      final saved = Map<String, dynamic>.from(data);
       newAddress = {...addressData, ...saved};
       newAddress['id'] ??= DateTime.now().millisecondsSinceEpoch;
     } else {
@@ -479,7 +480,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     setState(() {
       _savedAddresses.add(newAddress);
-      _selectedAddressId = int.tryParse(newAddress['id'].toString());
+      _selectedAddressId = _addressId(newAddress);
       _isSavingAddress = false;
       _showAddressForm = false;
     });
@@ -514,7 +515,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Map<String, dynamic>? get _selectedAddress {
     if (_selectedAddressId == null) return null;
     for (final address in _savedAddresses) {
-      if (address['id'] == _selectedAddressId) {
+      if (_addressId(address) == _selectedAddressId) {
         return Map<String, dynamic>.from(address);
       }
     }
@@ -559,11 +560,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
     if (!mounted) return;
 
     setState(() {
-      _savedAddresses.removeWhere((address) => address['id'] == addressId);
+      _savedAddresses.removeWhere(
+        (address) => _addressId(address) == addressId,
+      );
       if (_selectedAddressId == addressId) {
         _selectedAddressId = _savedAddresses.isEmpty
             ? null
-            : _savedAddresses.first['id'] as int;
+            : _addressId(_savedAddresses.first);
       }
       _showAddressForm = _savedAddresses.isEmpty;
     });
@@ -1102,7 +1105,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildAddressCard(Map<String, dynamic> address) {
-    final isSelected = _selectedAddressId == address['id'];
+    final addressId = _addressId(address);
+    final isSelected = _selectedAddressId == addressId;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 10),
@@ -1116,7 +1120,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
       child: InkWell(
         onTap: () => setState(() {
-          _selectedAddressId = address['id'];
+          _selectedAddressId = addressId;
           _showAddressForm = false;
         }),
         borderRadius: BorderRadius.circular(14),
@@ -1182,7 +1186,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   color: Colors.red,
                   size: 20,
                 ),
-                onPressed: () => _confirmDeleteAddress(address['id']),
+                onPressed: addressId == null
+                    ? null
+                    : () => _confirmDeleteAddress(addressId),
               ),
             ],
           ),
@@ -1232,7 +1238,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     _showAddressForm = false;
                     _clearForm();
                     if (_savedAddresses.isNotEmpty) {
-                      _selectedAddressId = _savedAddresses.first['id'];
+                      _selectedAddressId = _addressId(_savedAddresses.first);
                     }
                   }),
                   child: const Text('Cancel'),

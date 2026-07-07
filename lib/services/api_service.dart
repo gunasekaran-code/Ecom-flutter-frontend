@@ -1289,11 +1289,103 @@ class ApiService {
   //  ADDRESS APIs.
   // ─────────────────────────────────────────────
 
+  static Map<String, dynamic> _normalizeAddress(Map<String, dynamic> address) {
+    final rawId = address['id'] ?? address['address_id'];
+    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+    final user = address['user'] is Map ? address['user'] as Map : const {};
+    final fullName =
+        _firstStringValue(address, ['name', 'full_name']) ??
+        _firstStringValue(Map<String, dynamic>.from(user), [
+          'name',
+          'full_name',
+        ]) ??
+        '';
+    final nameParts = fullName.trim().split(RegExp(r'\s+'));
+    final firstName =
+        _firstStringValue(address, ['first_name']) ??
+        (nameParts.isNotEmpty && nameParts.first.isNotEmpty
+            ? nameParts.first
+            : null);
+    final lastName =
+        _firstStringValue(address, ['last_name']) ??
+        (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null);
+
+    return {
+      ...address,
+      'id': id ?? rawId,
+      'address_type':
+          _firstStringValue(address, ['address_type', 'type']) ?? 'home',
+      'first_name': firstName ?? '',
+      'last_name': lastName ?? '',
+      'email':
+          _firstStringValue(address, ['email']) ??
+          _firstStringValue(Map<String, dynamic>.from(user), ['email']) ??
+          '',
+      'phone':
+          _firstStringValue(address, ['phone', 'phone_number', 'mobile']) ??
+          _firstStringValue(Map<String, dynamic>.from(user), [
+            'phone',
+            'phone_number',
+            'mobile',
+          ]) ??
+          '',
+      'address_line_1':
+          _firstStringValue(address, [
+            'address_line_1',
+            'address1',
+            'line1',
+            'street',
+            'address',
+          ]) ??
+          '',
+      'address_line_2':
+          _firstStringValue(address, [
+            'address_line_2',
+            'address2',
+            'line2',
+            'landmark',
+          ]) ??
+          '',
+      'city': _firstStringValue(address, ['city']) ?? '',
+      'state': _firstStringValue(address, ['state', 'province']) ?? '',
+      'postal_code':
+          _firstStringValue(address, [
+            'postal_code',
+            'zip',
+            'zipcode',
+            'pin',
+          ]) ??
+          '',
+      'country': _firstStringValue(address, ['country']) ?? 'India',
+      'is_default':
+          address['is_default'] == true ||
+          address['default'] == true ||
+          address['is_default']?.toString() == '1',
+    };
+  }
+
   static Future<Map<String, dynamic>> getUserAddresses(int userId) async {
     try {
       final response = await _getJson('user/addresses/', authenticated: true);
       if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(response.body)};
+        final decoded = jsonDecode(response.body);
+        final addresses = _listFromDecoded(decoded, [
+          'data',
+          'addresses',
+          'address',
+          'results',
+          'items',
+        ]);
+        return {
+          'success': true,
+          'data': addresses
+              .whereType<Map>()
+              .map(
+                (address) =>
+                    _normalizeAddress(Map<String, dynamic>.from(address)),
+              )
+              .toList(),
+        };
       }
       return {
         'success': false,
@@ -1319,7 +1411,18 @@ class ApiService {
         authenticated: true,
       ); // fix: add auth, since it's presumably a protected user action
       if (response.statusCode == 201 || response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(response.body)};
+        final decoded = jsonDecode(response.body);
+        final rawAddress = decoded is Map && decoded['data'] is Map
+            ? decoded['data'] as Map
+            : decoded is Map && decoded['address'] is Map
+            ? decoded['address'] as Map
+            : decoded is Map
+            ? decoded
+            : <String, dynamic>{};
+        return {
+          'success': true,
+          'data': _normalizeAddress(Map<String, dynamic>.from(rawAddress)),
+        };
       }
       return {
         'success': false,
