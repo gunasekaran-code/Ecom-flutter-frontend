@@ -97,7 +97,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final pickedFile = await _picker.pickImage(
         source: source,
         imageQuality: 80,
-        maxWidth: 800,
+        maxWidth: 00,
       );
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
@@ -308,7 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         children: [
           // Gradient header backdrop
           Container(
-            height: 240,
+            height: 340,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
