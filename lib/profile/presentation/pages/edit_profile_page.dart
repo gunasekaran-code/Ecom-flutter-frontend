@@ -93,31 +93,31 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    try {
-      final pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 80,
-        maxWidth: 00,
-      );
-      if (pickedFile != null) {
-        final bytes = await pickedFile.readAsBytes();
-        setState(() {
-          _selectedImageFile = pickedFile;
-          _selectedImageBytes = bytes;
-        });
-      }
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        title: 'Error',
-        message: 'Failed to pick image: $e',
-        type: AppSnackBarType.error,
-      );
+  try {
+    final pickedFile = await _picker.pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 1024, // sensible value, or remove this param entirely
+    );
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _selectedImageFile = pickedFile;
+        _selectedImageBytes = bytes;
+      });
     }
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  } catch (e) {
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      title: 'Error',
+      message: 'Failed to pick image: $e',
+      type: AppSnackBarType.error,
+    );
   }
+}
 
   void _showImagePickerOptions() {
     showModalBottomSheet(
