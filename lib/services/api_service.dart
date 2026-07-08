@@ -1252,15 +1252,14 @@ class ApiService {
         'razorpay_signature': razorpaySignature,
       }, authenticated: true);
       final data = _decodeBody(response);
-      return _isSuccessStatus(response.statusCode)
-          ? {'success': true, 'data': data}
-          : {
-              'success': false,
-              'error': _errorMessage(
-                data,
-                'Could not verify Razorpay payment.',
-              ),
-            };
+      if (_isSuccessStatus(response.statusCode)) {
+        _notifyOrdersChanged(); // ← add this
+        return {'success': true, 'data': data};
+      }
+      return {
+        'success': false,
+        'error': _errorMessage(data, 'Could not verify Razorpay payment.'),
+      };
     } catch (e) {
       _logError('Razorpay verify-order exception: $e');
       return {'success': false, 'error': e.toString()};
