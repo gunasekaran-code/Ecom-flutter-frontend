@@ -159,6 +159,81 @@ class ApiService {
     return '$_assetBaseUrl$normalized';
   }
 
+  static String? _normalizedSku(dynamic value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty || text.toLowerCase() == 'null') {
+      return null;
+    }
+    return text.toLowerCase();
+  }
+
+  static String? _skuFromMap(Map<String, dynamic> data) {
+    for (final key in [
+      'sku',
+      'SKU',
+      'sku_id',
+      'skuId',
+      'variation_sku',
+      'variationSku',
+    ]) {
+      final sku = _normalizedSku(data[key]);
+      if (sku != null) return sku;
+    }
+    return null;
+  }
+
+  static void _addUniqueImage(List<String> images, String? raw) {
+    final image = _absoluteAssetUrl(raw);
+    if (image != null && !images.contains(image)) images.add(image);
+  }
+
+  static List<String> _imageUrlsFromList(dynamic rawImages) {
+    final urls = <String>[];
+    if (rawImages is! List) return urls;
+
+    for (final img in rawImages) {
+      if (img is Map<String, dynamic>) {
+        _addUniqueImage(
+          urls,
+          _firstStringValue(img, [
+            'image_url',
+            'image',
+            'product_image',
+            'variation_image',
+            'image_path',
+            'image_name',
+            'url',
+            'path',
+          ]),
+        );
+      } else {
+        _addUniqueImage(urls, img?.toString());
+      }
+    }
+    return urls;
+  }
+
+  static Map<String, List<String>> _imagesBySku(dynamic rawImages) {
+    final imagesBySku = <String, List<String>>{};
+    if (rawImages is! List) return imagesBySku;
+
+    for (final img in rawImages) {
+      if (img is! Map<String, dynamic>) continue;
+      final sku = _skuFromMap(img);
+      if (sku == null) continue;
+
+      final urls = _imageUrlsFromList([img]);
+      if (urls.isEmpty) continue;
+
+      final skuImages = imagesBySku.putIfAbsent(sku, () => <String>[]);
+      for (final url in urls) {
+        if (!skuImages.contains(url)) skuImages.add(url);
+      }
+    }
+
+    return imagesBySku;
+  }
+
   static Map<String, dynamic> _normalizeCategory(
     Map<String, dynamic> category,
   ) {
@@ -719,6 +794,7 @@ class ApiService {
         //   "color": [ ... ] }
         // Flutter's chip UI needs a flat list: [ {id, type, label, price, stock, image, color_hex?}, ... ]
         final rawVariations = data['variations'];
+        final topLevelImagesBySku = _imagesBySku(data['images']);
         if (rawVariations is Map<String, dynamic>) {
           final List<Map<String, dynamic>> flat = [];
           rawVariations.forEach((type, options) {
@@ -732,15 +808,48 @@ class ApiService {
                       opt['label']?.toString() ??
                       '';
                   final normalizedType = type.toString().toLowerCase();
+                  final variationSku = _skuFromMap(opt);
+
+                  // ── Collect ALL images tied to this variation's SKU ──
+                  // Backend may return them in opt['images'] or in the
+                  // product-level images table with the same SKU value.
+                  final variationImages = <String>[];
+                  if (variationSku != null) {
+                    variationImages.addAll(
+                      topLevelImagesBySku[variationSku] ?? const <String>[],
+                    );
+                  }
+                  for (final image in _imageUrlsFromList(
+                    opt['images'] ?? opt['variation_images'],
+                  )) {
+                    if (!variationImages.contains(image)) {
+                      variationImages.add(image);
+                    }
+                  }
+                  // fallback: old single-image field, if backend didn't send an array
+                  if (variationImages.isEmpty) {
+                    _addUniqueImage(
+                      variationImages,
+                      opt['image']?.toString() ?? opt['image_url']?.toString(),
+                    );
+                  }
+
                   flat.add({
                     'id': opt['variation_item_id'] ?? opt['id'],
                     'type': normalizedType,
                     'label': label,
                     'value': label,
+                    'sku': opt['sku'] ?? opt['SKU'],
                     'price': opt['price'],
                     'stock': stock,
                     'is_available': opt['is_available'] ?? (stock > 0),
-                    'image': opt['image'] ?? opt['image_url'],
+                    'image': variationImages.isNotEmpty
+                        ? variationImages.first
+                        : null,
+                    'image_url': variationImages.isNotEmpty
+                        ? variationImages.first
+                        : null,
+                    'images': variationImages, // ← full SKU-filtered list
                     if (normalizedType == 'color')
                       'color_hex': _colorNameToHex(label),
                   });
@@ -760,6 +869,23 @@ class ApiService {
           normalized['variations'] = variations.map((v) {
             if (v is Map<String, dynamic>) {
               final parsedVariation = Map<String, dynamic>.from(v);
+              final variationSku = _skuFromMap(parsedVariation);
+              final variationImages = <String>[];
+
+              if (variationSku != null) {
+                variationImages.addAll(
+                  topLevelImagesBySku[variationSku] ?? const <String>[],
+                );
+              }
+              for (final image in _imageUrlsFromList(
+                parsedVariation['images'] ??
+                    parsedVariation['variation_images'],
+              )) {
+                if (!variationImages.contains(image)) {
+                  variationImages.add(image);
+                }
+              }
+
               parsedVariation['image_url'] = _absoluteAssetUrl(
                 _firstStringValue(parsedVariation, [
                   'image_url',
@@ -768,6 +894,18 @@ class ApiService {
                   'image_path',
                 ]),
               );
+              if (variationImages.isEmpty) {
+                _addUniqueImage(
+                  variationImages,
+                  parsedVariation['image_url']?.toString(),
+                );
+              }
+              if (variationImages.isNotEmpty) {
+                parsedVariation['image'] = variationImages.first;
+                parsedVariation['image_url'] = variationImages.first;
+                parsedVariation['images'] = variationImages;
+              }
+              parsedVariation['sku'] ??= parsedVariation['SKU'];
               return parsedVariation;
             }
             return v;

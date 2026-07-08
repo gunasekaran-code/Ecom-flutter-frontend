@@ -44,17 +44,84 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             _variationStock(selectedVariation!) > 0
       : ProductData.isInStock(product!);
 
+  // static size and color variations are supported, but any other type is treated as a text label.
+  // Standard size ordering — anything not in this list falls to the end,
+  // sorted alphabetically among themselves.
+  static const List<String> _sizeOrder = [
+    'xxs',
+    'xs',
+    's',
+    'small',
+    'm',
+    'medium',
+    'l',
+    'large',
+    'xl',
+    'extra large',
+    'xxl',
+    '2xl',
+    'xxxl',
+    '3xl',
+    '4xl',
+    '5xl',
+  ];
+
+  int _sizeSortIndex(String label) {
+    final normalized = label.trim().toLowerCase();
+    final index = _sizeOrder.indexOf(normalized);
+    return index == -1 ? _sizeOrder.length : index;
+  }
+
   // ── Image list: prepends the variation image when one is selected ──
-  // This drives the carousel so it jumps to the variation's image.
+
+  String? _imageUrlFromValue(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) {
+      return ProductData.assetUrl(
+        value['image_url']?.toString() ??
+            value['image']?.toString() ??
+            value['product_image']?.toString() ??
+            value['variation_image']?.toString() ??
+            value['image_path']?.toString() ??
+            value['url']?.toString() ??
+            value['path']?.toString(),
+      );
+    }
+    return ProductData.assetUrl(value.toString());
+  }
+
+  List<String> _variationImages(Map<String, dynamic>? variation) {
+    if (variation == null) return [];
+    final raw = variation['images'];
+    if (raw is List) {
+      final images = <String>[];
+      for (final item in raw) {
+        final url = _imageUrlFromValue(item);
+        if (url != null && !images.contains(url)) images.add(url);
+      }
+      if (images.isNotEmpty) return images;
+    }
+    final single = ProductData.assetUrl(
+      variation['image']?.toString() ?? variation['image_url']?.toString(),
+    );
+    return single != null ? [single] : [];
+  }
+
+  // Small helper for the chip thumbnail (still needs just one image)
+  String? _variationThumbnail(Map<String, dynamic>? variation) {
+    final imgs = _variationImages(variation);
+    return imgs.isNotEmpty ? imgs.first : null;
+  }
+
   List<String> get _displayImages {
     if (product == null) return [];
-    final base = ProductData.images(product!);
-
-    final varImage = _variationImage(selectedVariation);
-    if (varImage != null && !base.contains(varImage)) {
-      return [varImage, ...base];
+    if (selectedVariation != null) {
+      final varImages = _variationImages(selectedVariation);
+      if (varImages.isNotEmpty) {
+        return varImages; // ← filtered strictly by this SKU
+      }
     }
-    return base;
+    return ProductData.images(product!);
   }
 
   // ── Related products ───────────────────────────────────────────────
@@ -145,14 +212,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   // ── Trigger Ratings Sheet with Refresh Callback ────────────────────
   void _openRatingReviewsSheet() {
     if (product == null) return;
-    
+
     showRatingReviewsSheet(
       context,
       product!,
       onReviewSubmitted: () async {
         // 1. Fetch fresh data from the server using your existing widget.productId
         final freshDetail = await ApiService.getProductDetail(widget.productId);
-        
+
         if (freshDetail != null && mounted) {
           setState(() {
             // 2. Re-assign the product property to force a UI update with the new review
@@ -266,7 +333,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         : Colors.grey.shade400;
 
     return GestureDetector(
-      onTap: isUnavailable ? null : () => _selectVariation(isSelected ? null : v),
+      onTap: isUnavailable
+          ? null
+          : () => _selectVariation(isSelected ? null : v),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -469,11 +538,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return const SizedBox.shrink();
     }
 
-    // Group by type preserving insertion order
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final v in variations) {
       grouped.putIfAbsent(_variationType(v), () => []).add(v);
     }
+
+    // ── Sort size options low → high (S, M, L, XL, XXL, ...) ──
+    grouped.forEach((type, options) {
+      if (type == 'size') {
+        options.sort((a, b) {
+          final ai = _sizeSortIndex(_variationLabel(a));
+          final bi = _sizeSortIndex(_variationLabel(b));
+          if (ai != bi) return ai.compareTo(bi);
+          return _variationLabel(a).compareTo(_variationLabel(b));
+        });
+      }
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
