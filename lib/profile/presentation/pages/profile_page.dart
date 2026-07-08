@@ -20,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with RouteAware {
+  bool isLoading = true;
   final AppLanguageController _languageController =
       AppLanguageController.instance;
   late Map<String, dynamic> _userData;
@@ -47,6 +48,11 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
           ?.toString();
   String get _initial =>
       _fullName.trim().isNotEmpty ? _fullName.trim()[0].toUpperCase() : 'U';
+
+  // ── Pull-to-refresh handler ─────────────────────────────────────────
+  Future<void> _onRefresh() async {
+    await Future.wait([_loadUserData(), _loadStats()]);
+  }
 
   @override
   void initState() {
@@ -135,84 +141,96 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     return Scaffold(
       backgroundColor: kSurface,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 0),
-              _buildStatsRow(strings),
-              _buildSectionTitle(strings.account),
-              _buildActionGroup([
-                _ActionItem(
-                  icon: Icons.person_outline_rounded,
-                  title: strings.editProfile,
-                  subtitle: strings.updatePersonalInfo,
-                  onTap: () async {
-                    final updatedUser = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            EditProfilePage(userData: _userData),
-                      ),
-                    );
-                    if (updatedUser is Map<String, dynamic>) {
-                      setState(() {
-                        _userData = updatedUser;
-                      });
-                    }
-                  },
+        child: Column(
+          children: [
+            // ── STATIC PART (never scrolls) ──
+            _buildHeader(context),
+            _buildStatsRow(strings),
+
+            // ── SCROLLABLE PART (menu + logout) ──
+            Expanded(
+              child: RefreshIndicator(
+                color: kBrandRed,
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildSectionTitle(strings.account),
+                      _buildActionGroup([
+                        _ActionItem(
+                          icon: Icons.person_outline_rounded,
+                          title: strings.editProfile,
+                          subtitle: strings.updatePersonalInfo,
+                          onTap: () async {
+                            final updatedUser = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    EditProfilePage(userData: _userData),
+                              ),
+                            );
+                            if (updatedUser is Map<String, dynamic>) {
+                              setState(() {
+                                _userData = updatedUser;
+                              });
+                            }
+                          },
+                        ),
+                        _ActionItem(
+                          icon: Icons.lock_outline_rounded,
+                          title: strings.privacySecurity,
+                          subtitle: strings.password2faSessions,
+                          onTap: () {},
+                        ),
+                        _ActionItem(
+                          icon: Icons.notifications_none_rounded,
+                          title: strings.notifications,
+                          subtitle: strings.manageAlertsSounds,
+                          onTap: () {},
+                        ),
+                      ]),
+                      const SizedBox(height: 35),
+                      _buildSectionTitle(strings.preferences),
+                      _buildActionGroup([
+                        _ActionItem(
+                          icon: Icons.palette_outlined,
+                          title: strings.appearance,
+                          subtitle: strings.themeAndDisplay,
+                          onTap: () {},
+                        ),
+                        _ActionItem(
+                          icon: Icons.language_rounded,
+                          title: strings.language,
+                          subtitle: _languageLabel,
+                          onTap: () async {
+                            final selectedLanguage = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LanguagePage(),
+                              ),
+                            );
+                            if (selectedLanguage != null && mounted) {
+                              setState(() {});
+                            }
+                          },
+                        ),
+                        _ActionItem(
+                          icon: Icons.help_outline_rounded,
+                          title: strings.helpSupport,
+                          subtitle: strings.faqsAndContact,
+                          onTap: () {},
+                        ),
+                      ]),
+                      const SizedBox(height: 28),
+                      _buildLogoutButton(context, strings),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
-                _ActionItem(
-                  icon: Icons.lock_outline_rounded,
-                  title: strings.privacySecurity,
-                  subtitle: strings.password2faSessions,
-                  onTap: () {},
-                ),
-                _ActionItem(
-                  icon: Icons.notifications_none_rounded,
-                  title: strings.notifications,
-                  subtitle: strings.manageAlertsSounds,
-                  onTap: () {},
-                ),
-              ]),
-              const SizedBox(height: 35),
-              _buildSectionTitle(strings.preferences),
-              _buildActionGroup([
-                _ActionItem(
-                  icon: Icons.palette_outlined,
-                  title: strings.appearance,
-                  subtitle: strings.themeAndDisplay,
-                  onTap: () {},
-                ),
-                _ActionItem(
-                  icon: Icons.language_rounded,
-                  title: strings.language,
-                  subtitle: _languageLabel,
-                  onTap: () async {
-                    final selectedLanguage = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LanguagePage(),
-                      ),
-                    );
-                    if (selectedLanguage != null && mounted) {
-                      setState(() {});
-                    }
-                  },
-                ),
-                _ActionItem(
-                  icon: Icons.help_outline_rounded,
-                  title: strings.helpSupport,
-                  subtitle: strings.faqsAndContact,
-                  onTap: () {},
-                ),
-              ]),
-              const SizedBox(height: 28),
-              _buildLogoutButton(context, strings),
-              const SizedBox(height: 32),
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -332,49 +350,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                   ),
                 ],
               ),
-
-              if (_phone.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.phone_android_rounded,
-                      color: Colors.white70,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _phone,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (_gender != null && _gender!.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.wc_outlined,
-                      color: Colors.white70,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _gender!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ],
@@ -621,3 +596,55 @@ class _ActionItem extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+              // if (_phone.isNotEmpty) ...[
+              //   const SizedBox(height: 6),
+              //   Row(
+              //     mainAxisAlignment: MainAxisAlignment.center,
+              //     children: [
+              //       const Icon(
+              //         Icons.phone_android_rounded,
+              //         color: Colors.white70,
+              //         size: 16,
+              //       ),
+              //       const SizedBox(width: 6),
+              //       Text(
+              //         _phone,
+              //         style: const TextStyle(
+              //           color: Colors.white70,
+              //           fontSize: 14,
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ],
+              // if (_gender != null && _gender!.isNotEmpty) ...[
+              //   const SizedBox(height: 6),
+              //   Row(
+              //     mainAxisAlignment: MainAxisAlignment.center,
+              //     children: [
+              //       const Icon(
+              //         Icons.wc_outlined,
+              //         color: Colors.white70,
+              //         size: 16,
+              //       ),
+              //       const SizedBox(width: 6),
+              //       Text(
+              //         _gender!,
+              //         style: const TextStyle(
+              //           color: Colors.white70,
+              //           fontSize: 14,
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ],
